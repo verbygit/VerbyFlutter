@@ -4,16 +4,22 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:verby_flutter/domain/core/connectivity_helper.dart';
 import 'package:verby_flutter/presentation/screens/worker_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await EasyLocalization.ensureInitialized();
 
-  SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
+  // Initialize essential services in parallel
+  await Future.wait([
+    EasyLocalization.ensureInitialized(),
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]),
   ]);
+
+  ConnectivityHelper().initialize();
   runApp(
     ProviderScope(
       child: EasyLocalization(

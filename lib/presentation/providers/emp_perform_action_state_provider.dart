@@ -1,0 +1,379 @@
+import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:verby_flutter/core/date_time_helper.dart';
+import 'package:verby_flutter/data/data_source/local/shared_preference_helper.dart';
+import 'package:verby_flutter/data/models/local/depa_restant_model.dart';
+import 'package:verby_flutter/data/models/local/employee_performs_state.dart';
+import 'package:verby_flutter/data/models/remote/employee.dart';
+import 'package:verby_flutter/data/models/remote/record/CreateRecordRequest.dart';
+import 'package:verby_flutter/data/models/remote/record/depa_record.dart';
+import 'package:verby_flutter/data/models/remote/record/restant_record.dart';
+import 'package:verby_flutter/domain/core/connectivity_helper.dart';
+import 'package:verby_flutter/domain/entities/action.dart';
+import 'package:verby_flutter/domain/entities/perform.dart';
+import 'package:verby_flutter/domain/entities/room_status.dart';
+import 'package:verby_flutter/domain/entities/states/empPerformAndActionState.dart';
+import 'package:verby_flutter/domain/use_cases/depa_restant/delete_depa_restants_use_case.dart';
+import 'package:verby_flutter/domain/use_cases/employee/delete_performance_state_use_case.dart';
+import 'package:verby_flutter/domain/use_cases/employee/get_emp_perform_state_by_id_use_case.dart';
+import 'package:verby_flutter/domain/use_cases/record/create_record_remotely__use_case.dart';
+import 'package:verby_flutter/presentation/providers/usecase/depa_restant/delete_depa_restants_usecase_provider.dart';
+import 'package:verby_flutter/presentation/providers/usecase/employee/delete_emp_action_state_usecase_provider.dart';
+import 'package:verby_flutter/presentation/providers/usecase/employee/delete_emp_perform_state_usecase_provider.dart';
+import 'package:verby_flutter/presentation/providers/usecase/employee/get_emp_action_state_by_id_usecase.dart';
+import 'package:verby_flutter/presentation/providers/usecase/employee/get_emp_perform_state_by_id_usecase.dart';
+import 'package:verby_flutter/presentation/providers/usecase/employee/insert_emp_action_state_usecase.dart';
+import 'package:verby_flutter/presentation/providers/usecase/employee/insert_employee_perform_state_usecase.dart';
+
+import 'package:verby_flutter/presentation/providers/usecase/record/create__remote_record.dart';
+
+import '../../data/models/local/employee_action_state.dart';
+import '../../domain/use_cases/employee/delete_action_state_use_case.dart';
+import '../../domain/use_cases/employee/get_emp_action_state_by_id_use_case.dart';
+import '../../domain/use_cases/employee/insert_emp_action_state.dart';
+import '../../domain/use_cases/employee/insert_employee_perform_state.dart';
+
+class EmpPerformAndActionStateNotifier
+    extends StateNotifier<EmployeePerformAndActionState> {
+  final InsertEmployeePerformState _insertEmpPerformState;
+  final InsertEmpActionState _insertEmpActionState;
+  final CreateRecordRemotelyUseCase _createRecordRemotelyUseCase;
+  final GetEmpActionStateByIdUseCase _getEmpActionStateById;
+  final GetEmpPerformStateByIdUseCase _getEmpPerformStateById;
+  final DeletePerformanceStateUseCase _deleteEmpPerformState;
+  final DeleteActionStateUseCase _deleteEmpActionState;
+  final DeleteDepaRestantsUseCase _deleteDepaRestantsUseCase;
+
+  EmpPerformAndActionStateNotifier(
+    this._insertEmpPerformState,
+    this._insertEmpActionState,
+    this._createRecordRemotelyUseCase,
+    this._getEmpActionStateById,
+    this._getEmpPerformStateById,
+    this._deleteEmpPerformState,
+    this._deleteEmpActionState,
+    this._deleteDepaRestantsUseCase,
+  ) : super(
+        EmployeePerformAndActionState(
+          isInternetConnected: ConnectivityHelper().isConnected,
+        ),
+      );
+
+  void listenToInternetStatus() {
+    ConnectivityHelper().onStatusChange.listen((onData) {
+      if (onData == ConnectivityStatus.online) {
+        saveInternetStatus(true);
+      } else {
+        saveInternetStatus(false);
+      }
+    });
+  }
+
+  void saveInternetStatus(bool isConnected) {
+    state = state.copyWith(isInternetConnected: isConnected);
+  }
+
+  void setErrorMessage(String message) {
+    state = state.copyWith(errorMessage: message);
+  }
+
+  void setSuccessMessage(String message) {
+    state = state.copyWith(message: message);
+  }
+
+  Future<void> createRecord(
+    Employee employee,
+    Perform perform,
+    Action action,
+    List<DepaRestantModel?>? depa,
+    List<DepaRestantModel?>? restant,
+  ) async {
+    if (state.isInternetConnected) {
+      await createRecordOnServer(employee, perform, action, depa, restant);
+    } else {
+      await createRecordLocally(employee, perform, action, depa, restant);
+    }
+  }
+
+  Future<void> createRecordLocally(
+    Employee employee,
+    Perform perform,
+    Action action,
+    List<DepaRestantModel?>? depa,
+    List<DepaRestantModel?>? restant,
+  ) async {}
+
+  Future<void> createRecordOnServer(
+    Employee employee,
+    Perform perform,
+    Action action,
+    List<DepaRestantModel?>? depa,
+    List<DepaRestantModel?>? restant,
+  ) async {
+    state = state.copyWith(isLoading: true);
+    final user = SharedPreferencesHelper(
+      await SharedPreferences.getInstance(),
+    ).getUser();
+
+    final time = DateTimeHelper.getRecordFormatDate();
+
+    final depaRecordList = depa
+        ?.map(
+          (depaRestantModel) =>
+              DepaRecord.fromDepaRestantModel(depaRestantModel),
+        )
+        .toList();
+    final restantRecordList = restant
+        ?.map(
+          (depaRestantModel) =>
+              RestantRecord.fromDepaRestantModel(depaRestantModel),
+        )
+        .toList();
+
+    final recordRequest = CreateRecordRequest(
+      employee: employee.id,
+      device: user?.deviceID ?? -1,
+      action: action.getActionValue(),
+      perform: perform.getPerformValue(),
+      identity: 1,
+      time: time,
+      depa: depaRecordList,
+      restant: restantRecordList,
+    );
+
+    final result = await _createRecordRemotelyUseCase.call(recordRequest);
+    await result.fold(
+      (onError) {
+        state = state.copyWith(isLoading: false, errorMessage: onError.message);
+      },
+      (onData) async {
+        final empActionState = createEmployeeActionState(
+          time,
+          employee.id ?? -1,
+          action,
+        );
+        final empPerformState = createEmployeePerformState(
+          employee.id ?? -1,
+          perform,
+        );
+        await _insertEmpActionState.call(empActionState);
+
+        if (action != Action.CHECKOUT) {
+          await _insertEmpPerformState.call(empPerformState);
+        } else {
+          _deleteEmpPerformState.call(employee.id.toString());
+        }
+        await deleteDepaRestants(depa, restant);
+        String successMessage = createSuccessMessage(empActionState, action);
+        state = state.copyWith(isLoading: false, message: successMessage);
+      },
+    );
+  }
+
+  Future<bool> deleteDepaRestants(
+    List<DepaRestantModel?>? depas,
+    List<DepaRestantModel?>? restants,
+  ) async {
+    if (depas != null && restants != null) {
+      List<String> depaIds = depas
+          .where(
+            (depa) =>
+                RoomStatus.getRoomStatus(depa?.status ?? 0) !=
+                RoomStatus.DEFAULT,
+          )
+          .toList()
+          .map((depas) => depas?.id.toString() ?? "")
+          .toList();
+
+      List<String> restantIds = restants
+          .where(
+            (restant) =>
+                RoomStatus.getRoomStatus(restant?.status ?? 0) !=
+                RoomStatus.DEFAULT,
+          )
+          .toList()
+          .map((restant) => restant?.id.toString() ?? "")
+          .toList();
+      depaIds.addAll(restantIds);
+      return await _deleteDepaRestantsUseCase.call(depaIds);
+    }
+    return true;
+  }
+
+  String createSuccessMessage(
+    EmployeeActionState empActionState,
+    Action action,
+  ) {
+    if (action != Action.CHECKOUT) return "thank".tr();
+    double workerHours = DateTimeHelper.getWorkingHours(
+      empActionState.lastActionTime,
+    );
+
+    if (workerHours > 5.5 && empActionState.hadAPause == false) {
+      return "thank_with_pause".tr();
+    } else {
+      return "thank".tr();
+    }
+  }
+
+  void setCurrentPerformAndActionState(int employeeId) async {
+    final empPerformStateResult = await _getEmpPerformStateById.call(
+      employeeId.toString(),
+    );
+    final empActionStateResult = await _getEmpActionStateById.call(
+      employeeId.toString(),
+    );
+
+    await empPerformStateResult.fold(
+      (onError) async {
+        state = state.copyWith(errorMessage: "failed-to-process".tr());
+      },
+      (onData) async {
+        EmployeePerformState? employeePerformState = onData;
+        employeePerformState ??= EmployeePerformState(
+          id: employeeId,
+          isBuro: true,
+          isMaintenance: true,
+          isRoomCleaning: true,
+          isRoomControl: true,
+          isStewarding: true,
+        );
+        state = state.copyWith(currentEmpPerformState: employeePerformState);
+      },
+    );
+    await empActionStateResult.fold(
+      (onError) async {
+        state = state.copyWith(errorMessage: "failed-to-process".tr());
+      },
+      (onData) async {
+        state = state.copyWith(currentEmpActionState: onData);
+      },
+    );
+  }
+
+  EmployeePerformState createEmployeePerformState(
+    int employeeId,
+    Perform perform,
+  ) {
+    var employeePerformState = EmployeePerformState(id: employeeId);
+
+    switch (perform) {
+      case Perform.BURO:
+        {
+          employeePerformState.isBuro = true;
+        }
+        break;
+      case Perform.MAINTENANCE:
+        {
+          employeePerformState.isMaintenance = true;
+        }
+        break;
+      case Perform.ROOMCLEANING:
+        {
+          employeePerformState.isRoomCleaning = true;
+        }
+        break;
+      case Perform.ROOMCONTROL:
+        {
+          employeePerformState.isRoomControl = true;
+        }
+        break;
+      case Perform.STEWARDING:
+        {
+          employeePerformState.isStewarding = true;
+        }
+        break;
+      case Perform.ERROR:
+        break;
+    }
+    return employeePerformState;
+  }
+
+  EmployeeActionState createEmployeeActionState(
+    String time,
+    int employeeId,
+    Action action,
+  ) {
+    EmployeeActionState employeeActionState = EmployeeActionState(
+      id: employeeId,
+      lastActionTime: time,
+    );
+
+    switch (action) {
+      case Action.CHECKIN:
+        {
+          employeeActionState.checkedIn = false;
+          employeeActionState.pausedOut = false;
+          employeeActionState.checkInTime = time;
+        }
+        break;
+      case Action.PAUSEIN:
+        {
+          employeeActionState.pausedIn = false;
+          employeeActionState.checkedIn = false;
+          employeeActionState.checkedOut = false;
+          employeeActionState.hadAPause = true;
+
+          employeeActionState.checkInTime =
+              state.currentEmpActionState?.checkInTime ?? "";
+        }
+        break;
+      case Action.PAUSEOUT:
+        {
+          employeeActionState.pausedOut = false;
+          employeeActionState.checkedIn = false;
+
+          employeeActionState.checkInTime =
+              state.currentEmpActionState?.checkInTime ?? "";
+        }
+        break;
+      case Action.CHECKOUT:
+        {
+          employeeActionState.pausedOut = false;
+          employeeActionState.pausedIn = false;
+          employeeActionState.checkedOut = false;
+        }
+        break;
+      case Action.ERROR:
+    }
+    return employeeActionState;
+  }
+}
+
+final empPerformAndActionStateProvider =
+    StateNotifierProvider<
+      EmpPerformAndActionStateNotifier,
+      EmployeePerformAndActionState
+    >((ref) {
+      final insertEmpPerformState = ref.read(
+        insertEmployeePerformStateUseCaseProvider,
+      );
+      final insertEmpActionState = ref.read(
+        insertEmpActionStateUserCaseProvider,
+      );
+
+      final getEmpActionStateById = ref.read(getEmpActionStateByIdProvider);
+      final getEmpPerformStateById = ref.read(getEmpPerformStateByIdProvider);
+      final createRecordRemotelyUseCase = ref.read(
+        createRecordRemotelyUseCaseProvider,
+      );
+      final deleteEmpActionStateUseCase = ref.read(
+        deleteEmpActionStateProvider,
+      );
+      final deleteEmpPerformStateUseCase = ref.read(
+        deleteEmpPerformStateProvider,
+      );
+
+      final deleteDepaRestantsUseCase = ref.read(deleteDepaRestantProvider);
+      return EmpPerformAndActionStateNotifier(
+        insertEmpPerformState,
+        insertEmpActionState,
+        createRecordRemotelyUseCase,
+        getEmpActionStateById,
+        getEmpPerformStateById,
+        deleteEmpPerformStateUseCase,
+        deleteEmpActionStateUseCase,
+        deleteDepaRestantsUseCase,
+      );
+    });

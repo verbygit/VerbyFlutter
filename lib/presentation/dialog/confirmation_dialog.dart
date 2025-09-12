@@ -1,0 +1,69 @@
+import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+
+class ConfirmationDialog extends ConsumerWidget {
+  const ConfirmationDialog({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Dialog(
+      backgroundColor: Colors.white,
+      child: Padding(
+        padding: EdgeInsets.all(30.r),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              "confirmation_text".tr(),
+              style: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+                fontSize: 25.sp,
+              ),
+            ),
+            40.verticalSpace,
+
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context, false);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.all(10.r),
+                    child: Text(
+                      "no".tr(),
+                      style: TextStyle(color: Colors.white, fontSize: 15.sp),
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context, true);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                  ),
+
+                  child: Padding(
+                    padding: EdgeInsets.all(10.r),
+                    child: Text(
+                      "yes".tr(),
+                      style: TextStyle(color: Colors.white, fontSize: 15.sp),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
