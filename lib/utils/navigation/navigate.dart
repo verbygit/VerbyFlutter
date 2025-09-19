@@ -93,7 +93,7 @@ void safeNavigateBackWithDelay(BuildContext context, {Duration delay = const Dur
 }
 
 /// Safe navigation to screen with proper error handling
-void safeNavigateToScreen(BuildContext context, Widget widget) {
+void  safeNavigateToScreen(BuildContext context, Widget widget) {
   if (context.mounted) {
     try {
       navigateToScreen(context, widget);

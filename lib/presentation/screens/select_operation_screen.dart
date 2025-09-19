@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:lottie/lottie.dart';
 import 'package:verby_flutter/data/models/remote/employee.dart';
 import 'package:verby_flutter/domain/entities/perform.dart';
 import 'package:verby_flutter/presentation/providers/emp_perform_action_state_provider.dart';
@@ -34,7 +35,7 @@ class _SelectOperationScreenState extends ConsumerState<SelectOperationScreen> {
 
       ref
           .read(empPerformAndActionStateProvider.notifier)
-          .setCurrentPerformAndActionState(widget.employee.id!);
+          .syncData(widget.employee);
     });
   }
 
@@ -91,7 +92,7 @@ class _SelectOperationScreenState extends ConsumerState<SelectOperationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final empPerformAndActionState = ref.watch(
+    final state = ref.watch(
       empPerformAndActionStateProvider,
     );
     ref.listen(empPerformAndActionStateProvider, (previous, next) {
@@ -116,115 +117,133 @@ class _SelectOperationScreenState extends ConsumerState<SelectOperationScreen> {
           ),
         ),
       ),
-      body: Padding(
-        padding: EdgeInsets.all(5.r),
+      body: Stack(
+        children: [
+          Padding(
+            padding: EdgeInsets.all(5.r),
 
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _rowButton(
-              firstButtonName: "stewarding".tr().toUpperCase(),
-              secondButtonName: "unterhalt".tr().toUpperCase(),
-              firstButtonOnPressed:
-                  empPerformAndActionState
-                          .currentEmpPerformState
-                          ?.isStewarding ??
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _rowButton(
+                  firstButtonName: "stewarding".tr().toUpperCase(),
+                  secondButtonName: "unterhalt".tr().toUpperCase(),
+                  firstButtonOnPressed:
+                  state
+                      .currentEmpPerformState
+                      ?.isStewarding ??
                       true
-                  ? () {
-                      navigateToActionScreen(Perform.STEWARDING);
-                    }
-                  : null,
-              secondButtonOnPressed:
-                  empPerformAndActionState
-                          .currentEmpPerformState
-                          ?.isMaintenance ??
+                      ? () {
+                    navigateToActionScreen(Perform.STEWARDING);
+                  }
+                      : null,
+                  secondButtonOnPressed:
+                  state
+                      .currentEmpPerformState
+                      ?.isMaintenance ??
                       true
-                  ? () {
-                      navigateToActionScreen(Perform.MAINTENANCE);
-                    }
-                  : null,
-              firstButtonColor:
-                  empPerformAndActionState
-                          .currentEmpPerformState
-                          ?.isStewarding ??
+                      ? () {
+                    navigateToActionScreen(Perform.MAINTENANCE);
+                  }
+                      : null,
+                  firstButtonColor:
+                  state
+                      .currentEmpPerformState
+                      ?.isStewarding ??
                       true
-                  ? Colors.black
-                  : MColors().darkGrey,
-              secondButtonColor:
-                  empPerformAndActionState
-                          .currentEmpPerformState
-                          ?.isMaintenance ??
+                      ? Colors.black
+                      : MColors().darkGrey,
+                  secondButtonColor:
+                  state
+                      .currentEmpPerformState
+                      ?.isMaintenance ??
                       true
-                  ? Colors.black
-                  : MColors().darkGrey,
-            ),
-            40.verticalSpace,
-            _rowButton(
-              firstButtonName: "gouvernante".tr().toUpperCase(),
-              secondButtonName: "raumpflegerin".tr().toUpperCase(),
-              firstButtonOnPressed:
-                  empPerformAndActionState
-                          .currentEmpPerformState
-                          ?.isRoomControl ??
-                      true
-                  ? () {
-                      navigateToActionScreen(Perform.ROOMCONTROL);
-                    }
-                  : null,
-              secondButtonOnPressed:
-                  empPerformAndActionState
-                          .currentEmpPerformState
-                          ?.isRoomCleaning ??
-                      true
-                  ? () {
-                      navigateToActionScreen(Perform.ROOMCLEANING);
-                    }
-                  : null,
-              firstButtonColor:
-                  empPerformAndActionState
-                          .currentEmpPerformState
-                          ?.isRoomControl ??
-                      true
-                  ? Colors.black
-                  : MColors().darkGrey,
-              secondButtonColor:
-                  empPerformAndActionState
-                          .currentEmpPerformState
-                          ?.isRoomCleaning ??
-                      true
-                  ? Colors.black
-                  : MColors().darkGrey,
-            ),
-            40.verticalSpace,
-
-            SizedBox(
-              width: 170.w,
-              child: ElevatedButton(
-                onPressed:
-                    empPerformAndActionState.currentEmpPerformState?.isBuro ??
-                        true
-                    ? () {
-                        navigateToActionScreen(Perform.BURO);
-                      }
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor:
-                      empPerformAndActionState.currentEmpPerformState?.isBuro ??
-                          true
                       ? Colors.black
                       : MColors().darkGrey,
                 ),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20.r),
-                  child: Text(
-                    "buro".tr(),
-                    style: TextStyle(color: Colors.white, fontSize: 15.sp),
+                40.verticalSpace,
+                _rowButton(
+                  firstButtonName: "gouvernante".tr().toUpperCase(),
+                  secondButtonName: "raumpflegerin".tr().toUpperCase(),
+                  firstButtonOnPressed:
+                  state
+                      .currentEmpPerformState
+                      ?.isRoomControl ??
+                      true
+                      ? () {
+                    navigateToActionScreen(Perform.ROOMCONTROL);
+                  }
+                      : null,
+                  secondButtonOnPressed:
+                  state
+                      .currentEmpPerformState
+                      ?.isRoomCleaning ??
+                      true
+                      ? () {
+                    navigateToActionScreen(Perform.ROOMCLEANING);
+                  }
+                      : null,
+                  firstButtonColor:
+                  state
+                      .currentEmpPerformState
+                      ?.isRoomControl ??
+                      true
+                      ? Colors.black
+                      : MColors().darkGrey,
+                  secondButtonColor:
+                  state
+                      .currentEmpPerformState
+                      ?.isRoomCleaning ??
+                      true
+                      ? Colors.black
+                      : MColors().darkGrey,
+                ),
+                40.verticalSpace,
+
+                SizedBox(
+                  width: 170.w,
+                  child: ElevatedButton(
+                    onPressed:
+                    state.currentEmpPerformState?.isBuro ??
+                        true
+                        ? () {
+                      navigateToActionScreen(Perform.BURO);
+                    }
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor:
+                      state.currentEmpPerformState?.isBuro ??
+                          true
+                          ? Colors.black
+                          : MColors().darkGrey,
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20.r),
+                      child: Text(
+                        "buro".tr(),
+                        style: TextStyle(color: Colors.white, fontSize: 15.sp),
+                      ),
+                    ),
                   ),
+                ),
+              ],
+            ),
+          ),
+          if (state.isLoading)
+            Container(
+              width: double.infinity,
+              height: double.infinity,
+              color: Colors.black38,
+              child: Center(
+                child: Lottie.asset(
+                  'assets/animation/loading_animation.json',
+                  width: 200,
+                  height: 200,
+                  fit: BoxFit.contain,
                 ),
               ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }

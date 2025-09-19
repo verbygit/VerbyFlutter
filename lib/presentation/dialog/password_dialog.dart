@@ -49,8 +49,7 @@ class _PasswordDialogState extends ConsumerState<PasswordDialog> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           ref.read(loginProvider.notifier).clearError();
-          Navigator.pop(context); // Close the dialog first
-          navigateToScreen(context, SettingScreen());
+          Navigator.pop(context,true); // Close the dialog first
         }
       });
     }

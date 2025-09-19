@@ -239,12 +239,12 @@ class _RoomAndDepaScreenState extends ConsumerState<RoomAndDepaScreen> {
                                 .getDepasAndRestant(widget.employee.id ?? -1);
                           },
                           child: Padding(
-                            padding: EdgeInsets.all(10.r),
+                            padding: EdgeInsets.symmetric(horizontal: 10.r, vertical: 20.r),
                             child: Text(
                               "reset".tr(),
                               style: TextStyle(
                                 color: Colors.white,
-                                fontSize: 20.sp,
+                                fontSize: 15.sp,
                               ),
                             ),
                           ),
@@ -261,12 +261,12 @@ class _RoomAndDepaScreenState extends ConsumerState<RoomAndDepaScreen> {
                           ),
 
                           child: Padding(
-                            padding: EdgeInsets.all(10.r),
+                            padding: EdgeInsets.symmetric(horizontal: 10.r, vertical: 20.r),
                             child: Text(
                               "submit_button".tr(),
                               style: TextStyle(
                                 color: Colors.white,
-                                fontSize: 20.sp,
+                                fontSize: 16.sp,
                               ),
                             ),
                           ),

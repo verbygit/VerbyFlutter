@@ -87,12 +87,12 @@ class FaceRecognition {
       double distance = nearest.$2;
       print('🔍 Nearest face found - Distance: ${distance.toStringAsFixed(3)}');
       
-      // More lenient threshold for better user experience
-      if (distance < 1.5) { // Increased from 0.6 to 1.5 for same person recognition
+      // Balanced threshold for good security and usability
+      if (distance < 1.2) { // Adjusted to 1.2 for better usability while maintaining security
         print('✅ Face recognized with high confidence');
         return Recognition(nearest.$1.id, nearest.$1.name, distance, []);
       } else {
-        print('❌ Face distance too high: ${distance.toStringAsFixed(3)} (threshold: 1.5)');
+        print('❌ Face distance too high: ${distance.toStringAsFixed(3)} (threshold: 1.2)');
       }
     } else {
       print('❌ No registered faces found for comparison');

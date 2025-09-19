@@ -1,61 +1,47 @@
-import 'package:dartz/dartz.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:verby_flutter/core/date_time_extension.dart';
-import 'package:verby_flutter/data/mappers/data_mappers.dart';
-import 'package:verby_flutter/data/models/local/depa_restant_model.dart';
-import 'package:verby_flutter/data/models/remote/calender/calender_response.dart';
+import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:verby_flutter/data/models/local/face_model.dart';
+import 'package:verby_flutter/data/models/remote/record/CreateRecordRequest.dart';
 import 'package:verby_flutter/data/models/remote/user_model.dart';
-import 'package:verby_flutter/domain/use_cases/depa_restant/get_depas_restants_use_case.dart';
-import 'package:verby_flutter/domain/use_cases/depa_restant/insert_depas_restants_use_case.dart';
-import 'package:verby_flutter/domain/use_cases/plan/get_plan_use_case.dart';
 import 'package:verby_flutter/domain/use_cases/employee/get_local_employee_usecase.dart';
-import 'package:verby_flutter/domain/use_cases/employee/insert_emp_action_states.dart';
-import 'package:verby_flutter/domain/use_cases/employee/insert_employee_perform_states.dart';
-import 'package:verby_flutter/domain/use_cases/plan/insert_plans_use_case.dart';
-import 'package:verby_flutter/domain/use_cases/record/get_record_from_server_use_case.dart';
-import 'package:verby_flutter/presentation/providers/usecase/depa_restant/get_depas_restants_use_case_provider.dart';
-import 'package:verby_flutter/presentation/providers/usecase/depa_restant/insert_depas_restants_usecase_provider.dart';
+import 'package:verby_flutter/domain/use_cases/record/clear_record_use_case.dart';
+import 'package:verby_flutter/domain/use_cases/record/create_multi_record_remotely__use_case.dart';
+import 'package:verby_flutter/domain/use_cases/record/get_local_record_usecase.dart';
+import 'package:verby_flutter/domain/use_cases/sync/sync_data_use_case.dart';
+import 'package:verby_flutter/presentation/providers/reposiory/face_repo_provider.dart';
 import 'package:verby_flutter/presentation/providers/usecase/employee/get_local_employee_usecase_provider.dart';
-import 'package:verby_flutter/presentation/providers/usecase/employee/insert_emp_action_state_usecase.dart';
-import 'package:verby_flutter/presentation/providers/usecase/employee/insert_employee_perform_state_usecase.dart';
-import 'package:verby_flutter/presentation/providers/usecase/plan/insert_plans_usecase_provider.dart';
-import '../../data/models/local/employee_action_state.dart';
-import '../../data/models/local/employee_performs_state.dart';
-import '../../data/models/local/plan.dart';
+import 'package:verby_flutter/presentation/providers/usecase/record/clear_record_usecase_provider.dart';
+import 'package:verby_flutter/presentation/providers/usecase/record/create_multi_remote_record.dart';
+import 'package:verby_flutter/presentation/providers/usecase/record/get_records_usecase_provider.dart';
+import 'package:verby_flutter/presentation/providers/usecase/sync/sync_data_use_case_provider.dart';
+import '../../data/data_source/local/shared_preference_helper.dart';
 import '../../data/models/remote/employee.dart';
-import '../../data/models/remote/last_record.dart';
-import '../../data/models/remote/record_response.dart';
+import '../../data/models/remote/record/create_multi_record_request.dart';
 import '../../domain/core/connectivity_helper.dart';
-import '../../domain/core/failure.dart';
-import '../../domain/entities/action.dart';
-import '../../domain/entities/perform.dart';
-import '../../domain/entities/room_status.dart';
 import '../../domain/entities/states/worker_screen_state.dart';
-import 'usecase/plan/get_plan_use_case_provider.dart';
-import 'usecase/record/get_record_use_case_provider.dart';
+import '../../domain/repositories/face_repository.dart';
 
 class WorkerScreenProviderNotifier extends StateNotifier<WorkerScreenState> {
-  final GetRecordFromServerUseCase _getRecordFromServerUseCase;
-  final InsertEmployeePerformStates _insertEmpPerformStateUseCase;
-  final InsertEmpActionStates _insertEmpActionState;
-  final GetPlanUseCase _getPlanUseCase;
-  final InsertPlansUseCase _insertPlansUseCase;
   final GetLocalEmployeeUseCase _getLocalEmpUseCase;
-  final GetDepaRestantsUseCase _getDepaRestantsUseCase;
-  final InsertDepaRestantsUseCase _insertDepaRestantsUseCase;
+  final CreateMultiRecordRemotelyUseCase _createMultiRecordRemotelyUseCase;
+  final GetLocalRecordUseCase _getLocalRecordUseCase;
+  final ClearRecordUseCase _clearRecordUseCase;
+  final SyncDataUseCase _syncDataUseCase;
+  final FaceRepository faceRepository;
 
   WorkerScreenProviderNotifier(
-    this._getRecordFromServerUseCase,
-    this._insertEmpPerformStateUseCase,
-    this._insertEmpActionState,
-    this._getPlanUseCase,
-    this._insertPlansUseCase,
     this._getLocalEmpUseCase,
-    this._getDepaRestantsUseCase,
-    this._insertDepaRestantsUseCase,
+    this._createMultiRecordRemotelyUseCase,
+    this._getLocalRecordUseCase,
+    this._clearRecordUseCase,
+    this._syncDataUseCase,
+    this.faceRepository,
   ) : super(WorkerScreenState()) {
     getEmployees();
+    setSharedPreferencesHelper();
   }
 
   listenToInternetStatus() {
@@ -68,7 +54,58 @@ class WorkerScreenProviderNotifier extends StateNotifier<WorkerScreenState> {
     });
   }
 
-  void getEmployees() async {
+  void setSharedPreferencesHelper() async {
+    final sharedPreferencesHelper = SharedPreferencesHelper(
+      await SharedPreferences.getInstance(),
+    );
+    state = state.copyWith(sharedPreferencesHelper: sharedPreferencesHelper);
+    setFaceInfo();
+  }
+
+  void setFaceInfo() async {
+    final sharedPreferencesHelper = state.sharedPreferencesHelper;
+    final isFaceForAll = await sharedPreferencesHelper?.isFaceIdForAll();
+    final isFaceForRegisterFace = await sharedPreferencesHelper
+        ?.isFaceIdForRegisterFace();
+    state = state.copyWith(
+      sharedPreferencesHelper: sharedPreferencesHelper,
+      isFaceIdForAll: isFaceForAll,
+      isFaceForRegisterFace: isFaceForRegisterFace,
+    );
+  }
+
+  void syncData() async {
+    setIsSyncing(true);
+    await uploadLocalRecord();
+    if (state.isInternetConnected) {
+      if (state.employees != null &&
+          state.employees?.isNotEmpty == true &&
+          state.userModel != null &&
+          state.userModel?.deviceID != null) {
+        final result = await _syncDataUseCase.syncData(state.userModel!, true);
+        if (result.isNotEmpty) {
+          setErrorMessage(result);
+        }
+      }
+    }
+
+    await getEmployees();
+    setIsSyncing(false);
+  }
+
+  void setMessage(String message) {
+    state = state.copyWith(message: message);
+  }
+
+  void setErrorMessage(String message) {
+    state = state.copyWith(errorMessage: message);
+  }
+
+  void setIsSyncing(bool isSyncing) {
+    state = state.copyWith(isSyncing: isSyncing);
+  }
+
+  Future<void> getEmployees() async {
     final employees = await _getLocalEmpUseCase.call();
     await employees.fold(
       (onError) {
@@ -82,6 +119,57 @@ class WorkerScreenProviderNotifier extends StateNotifier<WorkerScreenState> {
     );
   }
 
+  Future<void> uploadLocalRecord() async {
+    final localRecordsResult = await _getLocalRecordUseCase.call();
+    localRecordsResult.fold(
+      ((onError) async {
+        if (kDebugMode) {
+          print(onError);
+        }
+      }),
+      (onData) async {
+        if (onData.isNotEmpty) {
+          final records = onData
+              .map(
+                (e) => CreateRecordRequest(
+                  action: e.action,
+                  device: e.device,
+                  employee: e.employee,
+                  identity: e.identity,
+                  perform: e.perform,
+                  time: e.time,
+                  depa: e.depa,
+                  restant: e.restant,
+                ),
+              )
+              .toList();
+
+          final createMultiRecordRequest = CreateMultiRecordRequest(
+            records: records,
+          );
+          final result = await _createMultiRecordRemotelyUseCase.call(
+            createMultiRecordRequest,
+          );
+          result.fold(
+            (onError) {
+              if (kDebugMode) {
+                print(onError);
+              }
+            },
+            (onData) async {
+              await _clearRecordUseCase.call();
+              state = state.copyWith(message: "record_sent_success".tr());
+            },
+          );
+        } else {
+          if (kDebugMode) {
+            print("Local records are empty===========>");
+          }
+        }
+      },
+    );
+  }
+
   void saveUser(UserModel user) {
     state = state.copyWith(userModel: user);
   }
@@ -90,237 +178,15 @@ class WorkerScreenProviderNotifier extends StateNotifier<WorkerScreenState> {
     state = state.copyWith(isInternetConnected: isConnected);
   }
 
-  Future<void> getDepaRestantAndEmployeesStates() async {
-    final userModel = state.userModel;
-    final employees = state.employees;
-
-    if (employees == null || userModel?.deviceID == null) {
-      state = state.copyWith(errorMessage: "Invalid input data");
-      return;
-    }
-
-    final List<EmployeeActionState> actionStates = [];
-    final List<EmployeePerformState> performStates = [];
-    final List<DepaRestantModel> depaRestants = [];
-    final List<String> errors = [];
-
-    final futures = employees.map((employee) async {
-      final empId = employee.id ?? -1;
-
-      final resultDepaAndRestant = _getDepaRestantsUseCase.call(
-        userModel?.deviceID.toString() ?? "",
-        empId,
-      );
-
-      final resultRecords = _getRecordFromServerUseCase.call(empId);
-
-      final results = await Future.wait([resultDepaAndRestant, resultRecords]);
-
-      // Handle Records result
-      final recordsResult = results[1] as Either<Failure, RecordResponse>;
-      await recordsResult.fold(
-        (onError) async {
-          errors.add(onError.message);
-        },
-        (onData) {
-          final lastRecords = onData.lastRecords;
-          if (lastRecords != null && lastRecords.isNotEmpty) {
-            final empActionState = createEmployeeActionState(onData);
-            actionStates.add(empActionState);
-
-            if (Action.getAction(lastRecords.first.action ?? -1) !=
-                Action.CHECKOUT) {
-              final empPerformState = createEmployeePerformState(
-                lastRecords.first,
-              );
-              performStates.add(empPerformState);
-            }
-          }
-        },
-      );
-
-      // Handle DepaRestant result
-      final depaResult = results[0] as Either<Failure, CalenderResponse>;
-      await depaResult.fold(
-        (onError) async {
-          errors.add(onError.message);
-        },
-        (onData) {
-          final depaList = onData.depa
-              ?.map(
-                (e) => e.toDepaRestantModel(
-                  empId.toString(),
-                  true,
-                  RoomStatus.CLEANED.getRoomStatusValue(),
-                ),
-              )
-              .toList();
-          final restantList = onData.restant
-              ?.map(
-                (e) => e.toDepaRestantModel(
-                  empId.toString(),
-                  false,
-                  RoomStatus.CLEANED.getRoomStatusValue(),
-                ),
-              )
-              .toList();
-
-          if (depaList != null) depaRestants.addAll(depaList);
-          if (restantList != null) depaRestants.addAll(restantList);
-        },
-      );
-    }).toList();
-
-    await Future.wait(futures);
-
-    if (depaRestants.isNotEmpty) {
-      await _insertDepaRestantsUseCase.call(depaRestants);
-    }
-
-    if (actionStates.isNotEmpty) {
-      await _insertEmpActionState.call(actionStates);
-    }
-
-    if (performStates.isNotEmpty) {
-      await _insertEmpPerformStateUseCase.call(performStates);
-    }
-
-    if (errors.isNotEmpty) {
-      state = state.copyWith(errorMessage: errors.join(", "));
-    }
-  }
-
-  Future<bool> getPlansAndSave(List<Employee> employees, int deviceId) async {
-    var isSuccessful = true;
-
-    final List<Plan> plans = [];
-
-    final futures = employees.map((employee) async {
-      final result = await _getPlanUseCase.call(
-        deviceId.toString(),
-        employee.id ?? -1,
-      );
-
-      await result.fold(
-        (onError) async {
-          if (kDebugMode) {
-            print("onError in provider ${onError.message}");
-          }
-          state = state.copyWith(errorMessage: onError.message);
-          isSuccessful = false;
-        },
-        (onData) async {
-          if (kDebugMode) {
-            print("Plan for ${employee.id}======> $onData");
-          }
-          plans.add(Plan(employeeId: employee.id ?? -1, time: onData));
-        },
-      );
-    }).toList();
-
-    await Future.wait(futures);
-    await _insertPlansUseCase.call(plans);
-
-    return isSuccessful;
-  }
-
-  EmployeePerformState createEmployeePerformState(LastRecords lastRecord) {
-    var employeePerformState = EmployeePerformState(
-      id: lastRecord.employeeId ?? -1,
-    );
-
-    switch (Perform.getPerform(lastRecord.perform ?? -1)) {
-      case Perform.BURO:
-        {
-          employeePerformState.isBuro = true;
-        }
-        break;
-      case Perform.MAINTENANCE:
-        {
-          employeePerformState.isMaintenance = true;
-        }
-        break;
-      case Perform.ROOMCLEANING:
-        {
-          employeePerformState.isRoomCleaning = true;
-        }
-        break;
-      case Perform.ROOMCONTROL:
-        {
-          employeePerformState.isRoomControl = true;
-        }
-        break;
-      case Perform.STEWARDING:
-        {
-          employeePerformState.isStewarding = true;
-        }
-        break;
-      case Perform.ERROR:
-        break;
-    }
-    return employeePerformState;
-  }
-
-  EmployeeActionState createEmployeeActionState(RecordResponse recordResponse) {
-    LastRecords lastRecord = recordResponse.lastRecords!.first;
-    String? latestActionTime = lastRecord.time?.toLocalTime() ?? "";
-    if (lastRecord.action == Action.CHECKIN.getActionValue()) {}
-
-    EmployeeActionState employeeActionState = EmployeeActionState(
-      id: lastRecord.employeeId ?? -1,
-      lastActionTime: latestActionTime,
-    );
-    switch (Action.getAction(lastRecord.action ?? -1)) {
-      case Action.CHECKIN:
-        {
-          employeeActionState.checkedIn = false;
-          employeeActionState.pausedOut = false;
-          employeeActionState.checkInTime = latestActionTime ?? "";
-        }
-        break;
-      case Action.PAUSEIN:
-        {
-          employeeActionState.pausedIn = false;
-          employeeActionState.checkedIn = false;
-          employeeActionState.checkedOut = false;
-          employeeActionState.hadAPause = true;
-          for (var record in recordResponse.lastRecords!) {
-            if (record.action == Action.CHECKIN.getActionValue()) {
-              employeeActionState.checkInTime =
-                  record.time?.toLocalTime() ?? "";
-            }
-          }
-        }
-        break;
-      case Action.PAUSEOUT:
-        {
-          employeeActionState.pausedOut = false;
-          employeeActionState.checkedIn = false;
-          for (var record in recordResponse.lastRecords!) {
-            if (record.action == Action.CHECKIN.getActionValue()) {
-              employeeActionState.checkInTime =
-                  record.time?.toLocalTime() ?? "";
-            }
-          }
-        }
-        break;
-
-      case Action.CHECKOUT:
-        {
-          employeeActionState.pausedOut = false;
-          employeeActionState.pausedIn = false;
-          employeeActionState.checkedOut = false;
-        }
-        break;
-      case Action.ERROR:
-    }
-    return employeeActionState;
-  }
-
   Employee? getEmployeeById(int id) {
+    print("getEmployeeById======================> invoked  id : $id");
     final employees = state.employees;
+    print("getEmployeeById employees=============> $employees");
     if (employees != null) {
       for (var employee in employees) {
+        print(
+          "getEmployeeById loop  employee=============> id: ${employee.id}",
+        );
         if (employee.id == id) {
           return employee;
         }
@@ -328,35 +194,42 @@ class WorkerScreenProviderNotifier extends StateNotifier<WorkerScreenState> {
     }
     return null;
   }
+
+  Future<FaceModel?> getFaceByEmpId(int empId) async {
+    final result = await faceRepository.getFaceByEmployeeId(empId.toString());
+
+    return result.fold(
+      (onError) async {
+        if (kDebugMode) {
+          print(onError);
+        }
+        return null;
+      },
+      (OnData) async {
+        return OnData;
+      },
+    );
+  }
 }
 
 final workerScreenProvider =
     StateNotifierProvider<WorkerScreenProviderNotifier, WorkerScreenState>((
       ref,
     ) {
-      final getRecordUseCase = ref.read(getRecordUseCaseProvider);
-      final insertEmpPerformState = ref.read(
-        insertEmployeePerformStatesUseCaseProvider,
-      );
-      final insertEmpActionState = ref.read(
-        insertEmpActionStatesUserCaseProvider,
-      );
-      final getPlanUseCase = ref.read(getPlanUseCaseProvider);
-      final getDepaRestantUseCase = ref.read(getDepaRestantsUseCaseProvider);
-      final insertPlanUseCase = ref.read(insertPlansUseCaseProvider);
       final getLocalEmpUseCase = ref.read(getLocalEmployeeUseCaseProvider);
-      final insertDepaRestantUseCase = ref.read(
-        insertDepaRestantsUseCaseProvider,
+      final createMultiRecordsUseCase = ref.read(
+        createMultiRecordRemoteUseCaseProvider,
       );
-
+      final getLocalRecords = ref.read(getRecordsUseCaseProvider);
+      final clearLocalRecordUseCase = ref.read(clearRecordUseCaseProvider);
+      final syncDataUseCase = ref.read(syncDataUseCaseProvider);
+      final faceRepository = ref.read(faceRepoProvider);
       return WorkerScreenProviderNotifier(
-        getRecordUseCase,
-        insertEmpPerformState,
-        insertEmpActionState,
-        getPlanUseCase,
-        insertPlanUseCase,
         getLocalEmpUseCase,
-        getDepaRestantUseCase,
-        insertDepaRestantUseCase,
+        createMultiRecordsUseCase,
+        getLocalRecords,
+        clearLocalRecordUseCase,
+        syncDataUseCase,
+        faceRepository,
       );
     });

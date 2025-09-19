@@ -14,8 +14,10 @@ class SharedPreferencesHelper {
   final String SWITCH_INDICES_KEY = "indices";
   final String USER_DETAILS_KEY = "user_details";
   static final String DEVICE_ID_KEY = "device_id";
-  static final  String TOKEN_KEY = "token";
+  static final String TOKEN_KEY = "token";
   final String USER_PASSWORD = "user_password";
+  final String IS_FACE_ID_FOR_ALL_KEY = "face_id_for_all";
+  final String IS_FACE_ID_FOR_REGISTER_FACE_KEY = "face_id_for_register_face";
   final key = encrypt.Key.fromUtf8(
     'jetverbyverbiccajetverbyverbicca',
   ); // 32 characters for AES-256
@@ -54,6 +56,20 @@ class SharedPreferencesHelper {
   Future<void> remove(String key) async {
     await _sharedPreferences.remove(key);
   }
+
+  Future<void> setFaceIdForAll(bool value) async {
+    await _sharedPreferences.setBool(IS_FACE_ID_FOR_ALL_KEY, value);
+  }
+
+  Future<bool?> isFaceIdForAll() async =>
+      _sharedPreferences.getBool(IS_FACE_ID_FOR_ALL_KEY);
+
+  Future<void> setFaceIdForRegisterFace(bool value) async {
+    await _sharedPreferences.setBool(IS_FACE_ID_FOR_REGISTER_FACE_KEY, value);
+  }
+
+  Future<bool?> isFaceIdForRegisterFace() async =>
+      _sharedPreferences.getBool(IS_FACE_ID_FOR_REGISTER_FACE_KEY);
 
   Future<String?> getToken() async => _sharedPreferences.getString(TOKEN_KEY);
 

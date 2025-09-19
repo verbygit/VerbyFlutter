@@ -7,14 +7,13 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:verby_flutter/data/models/remote/employee.dart';
 import 'package:verby_flutter/presentation/dialog/pin_dialog.dart';
 import 'package:verby_flutter/presentation/widgets/error_box.dart';
+import 'package:verby_flutter/utils/helper_functions.dart';
 import 'package:verby_flutter/utils/navigation/navigate.dart';
 import '../providers/indentification_provider.dart';
 import '../screens/loader_screen.dart';
 
 class IdentificationDialog extends ConsumerStatefulWidget {
-  final void Function(Employee) onEmployeeFound;
-
-  const IdentificationDialog({super.key, required this.onEmployeeFound});
+  const IdentificationDialog({super.key});
 
   @override
   ConsumerState<ConsumerStatefulWidget> createState() {
@@ -25,8 +24,6 @@ class IdentificationDialog extends ConsumerStatefulWidget {
 class _IdentificationDialogState extends ConsumerState<IdentificationDialog> {
   final _idController = TextEditingController();
   FocusNode? _focusNode;
-
-
 
   Future<void> _checkEmployeeID() async {
     if (_idController.text.isEmpty) {
@@ -63,7 +60,7 @@ class _IdentificationDialogState extends ConsumerState<IdentificationDialog> {
       if (employee.id == int.parse(_idController.text)) {
         ref.read(identificationDialogProvider.notifier).clearError();
         safeNavigateBack(context);
-        widget.onEmployeeFound(employee);
+        Navigator.pop(context,employee);
       } else {
         ref
             .read(identificationDialogProvider.notifier)
@@ -85,15 +82,22 @@ class _IdentificationDialogState extends ConsumerState<IdentificationDialog> {
       FocusScope.of(context).requestFocus(_focusNode);
     });
   }
+
   @override
   void dispose() {
     _idController.dispose();
     _focusNode?.dispose();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     final identificationState = ref.watch(identificationDialogProvider);
+    ref.listen(identificationDialogProvider, (previous, next) {
+      if (next.error?.isNotEmpty == true) {
+        showErrorSnackBar(next.error!, context);
+      }
+    });
     return Dialog(
       backgroundColor: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.0)),
@@ -125,7 +129,7 @@ class _IdentificationDialogState extends ConsumerState<IdentificationDialog> {
               child: TextField(
                 focusNode: _focusNode,
                 controller: _idController,
-                style: TextStyle(fontSize: 20.sp),
+                style: TextStyle(fontSize: 20.sp,fontWeight: FontWeight.bold),
                 textAlign: TextAlign.center,
                 keyboardType: TextInputType.number,
                 onChanged: (text) {

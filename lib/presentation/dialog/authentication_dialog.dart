@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:lottie/lottie.dart';
+import 'package:verby_flutter/data/data_source/local/database_helper.dart';
 import 'package:verby_flutter/domain/entities/states/login_state.dart';
 
 import '../../utils/helper_functions.dart';
@@ -13,9 +14,9 @@ import '../screens/loader_screen.dart';
 import '../widgets/error_box.dart';
 
 class AuthenticationDialog extends ConsumerStatefulWidget {
-  final void Function(bool) isLoginSuccess;
+  final bool shouldClearAllData;
 
-  const AuthenticationDialog({super.key, required this.isLoginSuccess});
+  const AuthenticationDialog({super.key, required this.shouldClearAllData});
 
   @override
   ConsumerState<ConsumerStatefulWidget> createState() {
@@ -48,6 +49,29 @@ class _AuthenticationDialogState extends ConsumerState<AuthenticationDialog> {
     super.dispose();
   }
 
+  void login() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => const LoaderScreen(),
+        opaque: false,
+        barrierDismissible: false,
+      ),
+    );
+    if (widget.shouldClearAllData) {
+      await DatabaseHelper().clearAllTablesExcept();
+    }
+    await ref.read(loginProvider.notifier).login(email, password);
+
+    Navigator.pop(context,true);
+  }
+
+
   @override
   Widget build(BuildContext context) {
     final loginState = ref.watch(loginProvider);
@@ -61,17 +85,17 @@ class _AuthenticationDialogState extends ConsumerState<AuthenticationDialog> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           ref.read(loginProvider.notifier).resetLogin();
-          widget.isLoginSuccess(true);
-          Navigator.pop(context);
+          Navigator.pop(context, true);
         }
       });
     }
 
     return WillPopScope(
       onWillPop: () async {
-        // Close the app instead of closing the dialog
-        SystemNavigator.pop();
-        return false;
+        if (!widget.shouldClearAllData) {
+          SystemNavigator.pop();
+        }
+        return widget.shouldClearAllData;
       },
       child: Dialog(
         backgroundColor: Colors.white,
@@ -160,25 +184,7 @@ class _AuthenticationDialogState extends ConsumerState<AuthenticationDialog> {
                       ),
                       40.verticalSpace,
                       ElevatedButton(
-                        onPressed: () async {
-                          if (!_formKey.currentState!.validate()) {
-                            return;
-                          }
-                          final email = _emailController.text.trim();
-                          final password = _passwordController.text;
-                          Navigator.push(
-                            context,
-                            PageRouteBuilder(
-                              pageBuilder: (_, __, ___) => const LoaderScreen(),
-                              opaque: false,
-                              barrierDismissible: false,
-                            ),
-                          );
-                          await ref
-                              .read(loginProvider.notifier)
-                              .login(email, password);
-                          Navigator.pop(context);
-                        },
+                        onPressed: login,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.black,
                         ),

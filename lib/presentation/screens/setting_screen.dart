@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/src/widgets/framework.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:verby_flutter/data/models/remote/employee.dart';
 import 'package:verby_flutter/presentation/dialog/indentification_dialog.dart';
 import 'package:verby_flutter/presentation/dialog/password_dialog.dart';
 import 'package:verby_flutter/presentation/screens/face_registration_screen.dart';
@@ -11,7 +12,9 @@ import 'package:verby_flutter/presentation/widgets/switch_with_text.dart';
 import 'package:verby_flutter/utils/navigation/navigate.dart';
 import 'package:verby_flutter/presentation/providers/reposiory/face_repo_provider.dart';
 
+import '../dialog/authentication_dialog.dart';
 import '../dialog/pin_dialog.dart';
+import '../providers/setting_state_provider.dart';
 import '../widgets/custom_seekbar.dart';
 
 class SettingScreen extends ConsumerStatefulWidget {
@@ -24,7 +27,6 @@ class SettingScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingScreen extends ConsumerState<SettingScreen> {
-
   @override
   void initState() {
     super.initState();
@@ -132,10 +134,52 @@ class _SettingScreen extends ConsumerState<SettingScreen> {
     );
   }
 
+  void showIdentificationDialog() async {
+    final buildContext = context;
+    final employee = await showDialog<Employee>(
+      context: context,
+      builder: (context) => IdentificationDialog(),
+    );
+
+    if (employee != null) {
+      showPinDialog(buildContext, employee, (isCorrectPin) {
+        if (isCorrectPin) {
+          safeNavigateToScreen(
+            buildContext,
+            FaceRegistrationScreen(employee: employee),
+          );
+        }
+      });
+    }
+  }
+
+  void setFaceIdForAll(bool value) async {
+    ref.read(settingScreenStateProvider.notifier).setFaceIDForAll(value);
+  }
+
+  void setFaceIdForRegisterFace(bool value) async {
+    ref
+        .read(settingScreenStateProvider.notifier)
+        .setFaceIDForRegisterFace(value);
+  }
+
+  void _showAuthenticationDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AuthenticationDialog(shouldClearAllData: true);
+      },
+    );
+
+    if (result != null) {
+      Navigator.pop(context, true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final buildContext = context;
-
+    final state = ref.watch(settingScreenStateProvider);
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -146,20 +190,27 @@ class _SettingScreen extends ConsumerState<SettingScreen> {
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         actions: [
-          IconButton(
-            iconSize: 30.w,
-            onPressed: () {},
-            icon: Icon(Icons.cloud_download_outlined),
-            color: MColors().greenMunsell,
+          Padding(
+            padding: EdgeInsets.all(4.r),
+            child: IconButton(
+              iconSize: 30.w,
+              onPressed: () {},
+              icon: Icon(Icons.cloud_download_outlined),
+              color: MColors().greenMunsell,
+            ),
           ),
-          IconButton(
-            iconSize: 30.w,
-            onPressed: () {},
-            icon: Icon(Icons.key),
-            color: MColors().greenMunsell,
+
+          Padding(
+            padding: EdgeInsets.all(4.r),
+            child: IconButton(
+              iconSize: 30.w,
+              onPressed: _showAuthenticationDialog,
+              icon: Icon(Icons.key),
+              color: MColors().crimsonRed,
+            ),
           ),
         ],
-        actionsPadding: EdgeInsets.all(4),
+        actionsPadding: EdgeInsets.all(10.r),
       ),
       body: Column(
         children: [
@@ -190,8 +241,8 @@ class _SettingScreen extends ConsumerState<SettingScreen> {
                     padding: EdgeInsets.all(10.w),
                     child: TextSwitch(
                       text: "require_face_id_all".tr(),
-                      isChecked: false,
-                      onChanged: (value) {},
+                      isChecked: state.isFaceIdForAll,
+                      onChanged: setFaceIdForAll,
                     ),
                   ),
                   Padding(
@@ -206,8 +257,8 @@ class _SettingScreen extends ConsumerState<SettingScreen> {
                     padding: EdgeInsets.all(10.w),
                     child: TextSwitch(
                       text: "require_face_auth_opt".tr(),
-                      isChecked: false,
-                      onChanged: (value) {},
+                      isChecked: state.isFaceForRegisterFace,
+                      onChanged: setFaceIdForRegisterFace,
                     ),
                   ),
 
@@ -241,38 +292,7 @@ class _SettingScreen extends ConsumerState<SettingScreen> {
                           ),
                         ),
 
-                        onPressed: () {
-                          showDialog(
-                            context: context,
-                            builder: (context) => IdentificationDialog(
-                              onEmployeeFound: (employee) {
-                                safeNavigateBack(context);
-                                showPinDialog(
-                                  buildContext,
-                                  employee,
-                                  (isCorrectPin) {
-                                    if (isCorrectPin) {
-                                      // Add a small delay to ensure dialog is fully closed
-                                      Future.delayed(
-                                        Duration(milliseconds: 100),
-                                        () {
-                                          if (buildContext.mounted) {
-                                            safeNavigateToScreen(
-                                              buildContext,
-                                              FaceRegistrationScreen(
-                                                employee: employee,
-                                              ),
-                                            );
-                                          }
-                                        },
-                                      );
-                                    }
-                                  },
-                                );
-                              },
-                            ),
-                          );
-                        },
+                        onPressed: showIdentificationDialog,
                         child: Padding(
                           padding: EdgeInsets.all(12.w),
                           child: Text(

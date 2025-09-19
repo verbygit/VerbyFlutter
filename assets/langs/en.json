@@ -44,7 +44,8 @@
   "select": "Select",
   "no": "No",
   "yes": "Yes",
-  "confirmation_text": "Do you really want to continue?"
-
+  "confirmation_text": "Do you really want to continue?",
+  "record_sent_success": "Records sent successfully.",
+  "missing_face": "Missing Face ID, please register the Face ID first."
 
 }

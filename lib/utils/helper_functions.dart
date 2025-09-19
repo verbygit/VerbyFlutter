@@ -1,26 +1,29 @@
 import 'package:flutter/material.dart';
-
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 import '../presentation/theme/colors.dart';
 
 showSnackBar(String text, BuildContext context) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-        backgroundColor: MColors().freshGreen,
-        content: Text(
-          text,
-          style:
-              const TextStyle(color: Colors.black, fontWeight: FontWeight.w500),
-        )),
+
+  showToast(
+    text,
+    position: StyledToastPosition.center,
+    context: context,
+    backgroundColor: MColors().freshGreen90 ,
+    borderRadius: BorderRadius.circular(10),
+    textPadding: EdgeInsets.all(30.w),
+    textStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 22.sp,color: Colors.white,),
   );
 }
+
 showErrorSnackBar(String text, BuildContext context) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-        backgroundColor: MColors().crimsonRed,
-        content: Text(
-          text,
-          style:
-              const TextStyle(color: Colors.black, fontWeight: FontWeight.w500),
-        )),
+  showToast(
+    text,
+    position: StyledToastPosition.center,
+    context: context,
+    backgroundColor: MColors().crimsonRed90 ,
+    borderRadius: BorderRadius.circular(10),
+    textPadding: EdgeInsets.all(30.w),
+    textStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 22.sp,color: Colors.white,),
   );
 }

@@ -17,6 +17,7 @@ import 'package:verby_flutter/presentation/screens/select_operation_screen.dart'
 import 'package:verby_flutter/presentation/screens/setting_screen.dart';
 import 'package:verby_flutter/presentation/theme/colors.dart';
 import 'package:verby_flutter/presentation/widgets/text_clock.dart';
+import 'package:verby_flutter/utils/helper_functions.dart';
 import 'package:verby_flutter/utils/navigation/navigate.dart';
 import '../providers/login_provider.dart';
 
@@ -90,45 +91,54 @@ class _WorkerScreen extends ConsumerState<WorkerScreen> {
     }
   }
 
-  void _showAuthenticationDialog() {
-    showDialog(
+  void _showAuthenticationDialog() async {
+    final result = await showDialog<bool>(
       context: context,
-      barrierDismissible: false,
+      barrierDismissible: true,
       builder: (BuildContext context) {
-        return AuthenticationDialog(
-          isLoginSuccess: (isLoginSuccess) async {
-            _checkUserExist();
-            await Future.delayed(Duration(milliseconds: 100));
-            ref.read(workerScreenProvider.notifier).getEmployees();
-          },
-        );
+        return AuthenticationDialog(shouldClearAllData: false);
       },
     );
+    if (result != null) {
+      _checkUserExist();
+      await Future.delayed(Duration(milliseconds: 100));
+      ref.read(workerScreenProvider.notifier).getEmployees();
+    }
   }
 
   void _syncData() {
-    if (ref.read(workerScreenProvider).isInternetConnected) {
-      final employees = ref.watch(workerScreenProvider).employees;
-      final deviceId = ref.read(workerScreenProvider).userModel?.deviceID;
+    print("_syncData======================> invoked");
+    ref.read(workerScreenProvider.notifier).syncData();
+  }
 
-      if (employees != null &&
-          employees.isNotEmpty &&
-          deviceId != null &&
-          deviceId > 0) {
-        ref
-            .read(workerScreenProvider.notifier)
-            .getPlansAndSave(employees, deviceId);
-        ref
-            .read(workerScreenProvider.notifier)
-            .getDepaRestantAndEmployeesStates();
-      }
+  void navigateToSetting() async {
+    // showDialog(
+    //   context: context,
+    //   builder: (BuildContext context) {
+    //     return PasswordDialog();
+    //   },
+    // );
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => SettingScreen()),
+    );
+
+    if (result != null) {
+      _checkUserExist();
+      await Future.delayed(Duration(milliseconds: 100));
+      ref.read(workerScreenProvider.notifier).getEmployees();
     }
+    ref.read(workerScreenProvider.notifier).setSharedPreferencesHelper();
   }
 
   void _showPinDialog() {
     _focusNode?.unfocus();
+    if (ref.read(workerScreenProvider).isSyncing) {
+      showErrorSnackBar("Data syncing...", context);
+      return;
+    }
     if (employeeIDController.text.isEmpty) {
-      ref.read(loginProvider.notifier).setMessage("not_valid".tr());
+      ref.read(workerScreenProvider.notifier).setErrorMessage("not_valid".tr());
       return;
     }
     final employee = ref
@@ -137,17 +147,32 @@ class _WorkerScreen extends ConsumerState<WorkerScreen> {
     if (employee != null) {
       showPinDialog(context, employee, (onPinSuccess) async {
         if (onPinSuccess) {
-          // safeNavigateToScreen(
-          //   context,
-          //   FaceVerificationScreen(employee: employee),
-          // );
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => SelectOperationScreen(employee: employee),
-            ),
-          );
-          _syncData();
+          Widget? widget;
+          if (ref.read(workerScreenProvider).isFaceIdForAll ||
+              ref.read(workerScreenProvider).isFaceForRegisterFace) {
+            final face = await ref
+                .read(workerScreenProvider.notifier)
+                .getFaceByEmpId(employee.id ?? -1);
+            if (face == null) {
+              ref
+                  .read(workerScreenProvider.notifier)
+                  .setErrorMessage("missing_face".tr());
+            } else {
+              widget = FaceVerificationScreen(employee: employee);
+            }
+          } else {
+            widget = SelectOperationScreen(employee: employee);
+          }
+
+          if (widget != null) {
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => widget!),
+            );
+            if (result != null) {
+              _syncData();
+            }
+          }
         } else {
           ref.read(loginProvider.notifier).setMessage("incorrect_pin".tr());
         }
@@ -165,6 +190,20 @@ class _WorkerScreen extends ConsumerState<WorkerScreen> {
       if ((previous?.employees == null ||
               previous?.employees?.isEmpty == true) &&
           (next.employees != null && next.employees!.isNotEmpty)) {
+        _syncData();
+      }
+
+      if (next.message.isNotEmpty) {
+        showSnackBar(next.message, context);
+        ref.read(workerScreenProvider.notifier).setMessage("");
+      }
+      if (next.errorMessage.isNotEmpty) {
+        showErrorSnackBar(next.errorMessage, context);
+        ref.read(workerScreenProvider.notifier).setErrorMessage("");
+      }
+
+      if (previous?.isInternetConnected == false &&
+          next.isInternetConnected == true) {
         _syncData();
       }
     });
@@ -313,15 +352,7 @@ class _WorkerScreen extends ConsumerState<WorkerScreen> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             IconButton(
-                              onPressed: () {
-                                // showDialog(
-                                //   context: context,
-                                //   builder: (BuildContext context) {
-                                //     return PasswordDialog();
-                                //   },
-                                // );
-                                safeNavigateToScreen(context, SettingScreen());
-                              },
+                              onPressed: navigateToSetting,
                               icon: SvgPicture.asset(
                                 'assets/svg/ic_settings.svg',
                                 colorFilter: ColorFilter.mode(

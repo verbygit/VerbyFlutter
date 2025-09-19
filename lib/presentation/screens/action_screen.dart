@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart' hide Action;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:lottie/lottie.dart';
 import 'package:verby_flutter/data/models/remote/employee.dart';
 import 'package:verby_flutter/domain/core/connectivity_helper.dart';
 import 'package:verby_flutter/domain/entities/perform.dart';
@@ -96,7 +97,6 @@ class _ActionScreen extends ConsumerState<ActionScreen> {
   }
 
   void _createRecord(Action action) async {
-    if (!ConnectivityHelper().isConnected) return;
     if (action == Action.CHECKOUT &&
         (widget.perform == Perform.MAINTENANCE ||
             widget.perform == Perform.ROOMCLEANING ||
@@ -115,14 +115,6 @@ class _ActionScreen extends ConsumerState<ActionScreen> {
 
       return;
     }
-    Navigator.push(
-      context,
-      PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const LoaderScreen(),
-        opaque: false,
-        barrierDismissible: false,
-      ),
-    );
 
     callCreateRecordEndpoint(action, null, null);
   }
@@ -132,19 +124,17 @@ class _ActionScreen extends ConsumerState<ActionScreen> {
     List<DepaRestantModel?>? depa,
     List<DepaRestantModel?>? restant,
   ) async {
-    await ref
+    final result = await ref
         .read(empPerformAndActionStateProvider.notifier)
         .createRecord(widget.employee, widget.perform, action, depa, restant);
-    Navigator.pop(context);
-    await Future.delayed(Duration(milliseconds: 100));
-    Navigator.popUntil(context, (Route<dynamic> route) => route.isFirst);
+    if (result) {
+      Navigator.popUntil(context, (Route<dynamic> route) => route.isFirst);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final empPerformAndActionState = ref.watch(
-      empPerformAndActionStateProvider,
-    );
+    final state = ref.watch(empPerformAndActionStateProvider);
 
     ref.listen(empPerformAndActionStateProvider, (previous, next) {
       if (previous?.errorMessage != next.errorMessage) {
@@ -174,95 +164,99 @@ class _ActionScreen extends ConsumerState<ActionScreen> {
           ),
         ),
       ),
-      body: Padding(
-        padding: EdgeInsets.all(5.r),
+      body: Stack(
+        children: [
+          Padding(
+            padding: EdgeInsets.all(5.r),
 
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _rowButtonWithIcon(
-              firstButtonName: "checkin".tr().toUpperCase(),
-              secondButtonName: "check-out".tr().toUpperCase(),
-              firstButtonIcon: Icons.play_arrow_outlined,
-              secondButtonIcon: Icons.stop_outlined,
-              firstButtonOnPressed:
-                  empPerformAndActionState.currentEmpActionState?.checkedIn ??
-                      true
-                  ? () {
-                      _createRecord(Action.CHECKIN);
-                    }
-                  : null,
-              secondButtonOnPressed:
-                  empPerformAndActionState.currentEmpActionState?.checkedOut ??
-                      true
-                  ? () {
-                      _createRecord(Action.CHECKOUT);
-                    }
-                  : null,
-              firstButtonColor:
-                  empPerformAndActionState.currentEmpActionState?.checkedIn ??
-                      true
-                  ? Colors.black
-                  : MColors().darkGrey,
-              secondButtonColor:
-                  empPerformAndActionState.currentEmpActionState?.checkedOut ??
-                      true
-                  ? Colors.black
-                  : MColors().darkGrey,
-              firstIconColor:
-                  empPerformAndActionState.currentEmpActionState?.checkedIn ??
-                      true
-                  ? MColors().freshGreen
-                  : MColors().veryLightGray2,
-              secondIconColor:
-                  empPerformAndActionState.currentEmpActionState?.checkedOut ??
-                      true
-                  ? MColors().crimsonRed
-                  : MColors().veryLightGray2,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _rowButtonWithIcon(
+                  firstButtonName: "checkin".tr().toUpperCase(),
+                  secondButtonName: "check-out".tr().toUpperCase(),
+                  firstButtonIcon: Icons.play_arrow_outlined,
+                  secondButtonIcon: Icons.stop_outlined,
+                  firstButtonOnPressed:
+                      state.currentEmpActionState?.checkedIn ?? true
+                      ? () {
+                          _createRecord(Action.CHECKIN);
+                        }
+                      : null,
+                  secondButtonOnPressed:
+                      state.currentEmpActionState?.checkedOut ?? true
+                      ? () {
+                          _createRecord(Action.CHECKOUT);
+                        }
+                      : null,
+                  firstButtonColor:
+                      state.currentEmpActionState?.checkedIn ?? true
+                      ? Colors.black
+                      : MColors().darkGrey,
+                  secondButtonColor:
+                      state.currentEmpActionState?.checkedOut ?? true
+                      ? Colors.black
+                      : MColors().darkGrey,
+                  firstIconColor: state.currentEmpActionState?.checkedIn ?? true
+                      ? MColors().freshGreen
+                      : MColors().veryLightGray2,
+                  secondIconColor:
+                      state.currentEmpActionState?.checkedOut ?? true
+                      ? MColors().crimsonRed
+                      : MColors().veryLightGray2,
+                ),
+                40.verticalSpace,
+                _rowButtonWithIcon(
+                  firstButtonName: "pause-in".tr().toUpperCase(),
+                  secondButtonName: "pause-out".tr().toUpperCase(),
+                  firstButtonIcon: Icons.pause,
+                  secondButtonIcon: Icons.refresh,
+                  firstButtonOnPressed:
+                      state.currentEmpActionState?.pausedIn ?? true
+                      ? () {
+                          _createRecord(Action.PAUSEIN);
+                        }
+                      : null,
+                  secondButtonOnPressed:
+                      state.currentEmpActionState?.pausedOut ?? true
+                      ? () {
+                          _createRecord(Action.PAUSEOUT);
+                        }
+                      : null,
+                  firstButtonColor:
+                      state.currentEmpActionState?.pausedIn ?? true
+                      ? Colors.black
+                      : MColors().darkGrey,
+                  secondButtonColor:
+                      state.currentEmpActionState?.pausedOut ?? true
+                      ? Colors.black
+                      : MColors().darkGrey,
+                  firstIconColor: state.currentEmpActionState?.pausedIn ?? true
+                      ? MColors().amber
+                      : MColors().veryLightGray2,
+                  secondIconColor:
+                      state.currentEmpActionState?.pausedOut ?? true
+                      ? MColors().skyBlue
+                      : MColors().veryLightGray2,
+                ),
+              ],
             ),
-            40.verticalSpace,
-            _rowButtonWithIcon(
-              firstButtonName: "pause-in".tr().toUpperCase(),
-              secondButtonName: "pause-out".tr().toUpperCase(),
-              firstButtonIcon: Icons.pause,
-              secondButtonIcon: Icons.refresh,
-              firstButtonOnPressed:
-                  empPerformAndActionState.currentEmpActionState?.pausedIn ??
-                      true
-                  ? () {
-                      _createRecord(Action.PAUSEIN);
-                    }
-                  : null,
-              secondButtonOnPressed:
-                  empPerformAndActionState.currentEmpActionState?.pausedOut ??
-                      true
-                  ? () {
-                      _createRecord(Action.PAUSEOUT);
-                    }
-                  : null,
-              firstButtonColor:
-                  empPerformAndActionState.currentEmpActionState?.pausedIn ??
-                      true
-                  ? Colors.black
-                  : MColors().darkGrey,
-              secondButtonColor:
-                  empPerformAndActionState.currentEmpActionState?.pausedOut ??
-                      true
-                  ? Colors.black
-                  : MColors().darkGrey,
-              firstIconColor:
-                  empPerformAndActionState.currentEmpActionState?.pausedIn ??
-                      true
-                  ? MColors().amber
-                  : MColors().veryLightGray2,
-              secondIconColor:
-                  empPerformAndActionState.currentEmpActionState?.pausedOut ??
-                      true
-                  ? MColors().skyBlue
-                  : MColors().veryLightGray2,
+          ),
+          if (state.isLoading)
+            Container(
+              width: double.infinity,
+              height: double.infinity,
+              color: Colors.black38,
+              child: Center(
+                child: Lottie.asset(
+                  'assets/animation/loading_animation.json',
+                  width: 200,
+                  height: 200,
+                  fit: BoxFit.contain,
+                ),
+              ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }

@@ -44,6 +44,8 @@
   "select": "Auswählen",
   "no": "Nein",
   "yes": "Ja",
-  "confirmation_text": "Möchten Sie wirklich fortfahren?"
+  "confirmation_text": "Möchten Sie wirklich fortfahren?",
+  "record_sent_success": "Datensätze erfolgreich gesendet.",
+  "missing_face": "Fehlendes Gesicht! Bitte registrieren Sie Ihr Gesicht!"
 
 }

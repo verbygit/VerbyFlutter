@@ -16,8 +16,10 @@ class     MColors {
   final greenMunsell =const Color(0xFF1CAC78);
   final veryLightGray =const Color(0xCFFEFEFE);
   final freshGreen =const Color(0xFF5DAD54);
+  final freshGreen90 =const Color(0xFF5DAD54).withValues(alpha: 0.9);
   final veryLightGray2 =const Color(0xAAEAEAEA);
   final crimsonRed =const Color(0xFFC93732);
+  final crimsonRed90 =const Color(0xFFC93732).withValues(alpha: 0.9);
   final amber =const Color(0xFFE4AA50);
   final skyBlue =const Color(0xFF3C7BC3);
   final mediumDarkGray =const Color(0xFF898989);

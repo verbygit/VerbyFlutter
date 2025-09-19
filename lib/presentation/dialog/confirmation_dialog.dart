@@ -25,41 +25,54 @@ class ConfirmationDialog extends ConsumerWidget {
             ),
             40.verticalSpace,
 
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context, false);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.all(10.r),
-                    child: Text(
-                      "no".tr(),
-                      style: TextStyle(color: Colors.white, fontSize: 15.sp),
+            Container(
+              color: Colors.white,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context, false);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black,
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.all(10.r),
+                        child: Text(
+                          "no".tr(),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15.sp,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context, true);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                  ),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context, true);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black,
+                      ),
 
-                  child: Padding(
-                    padding: EdgeInsets.all(10.r),
-                    child: Text(
-                      "yes".tr(),
-                      style: TextStyle(color: Colors.white, fontSize: 15.sp),
+                      child: Padding(
+                        padding: EdgeInsets.all(10.r),
+                        child: Text(
+                          "yes".tr(),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15.sp,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),

@@ -209,6 +209,9 @@ class LoginNotifier extends StateNotifier<LoginState> {
   void setMessage(String message) {
     state = state.copyWith(message: message);
   }
+  void setErrorMessage(String message) {
+    state = state.copyWith(error: message);
+  }
 
   void saveInternetStatus(bool isConnected) {
     state = state.copyWith(isInternetConnected: isConnected);

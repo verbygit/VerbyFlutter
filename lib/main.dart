@@ -23,7 +23,7 @@ void main() async {
   runApp(
     ProviderScope(
       child: EasyLocalization(
-        supportedLocales: [Locale('en', ''), Locale('de', 'DE')],
+        supportedLocales: [Locale('en'), Locale('de')],
         path: 'assets/langs',
         fallbackLocale: Locale('en', ''),
         child: Verby(),

@@ -1,10 +1,12 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:verby_flutter/core/date_time_helper.dart';
 import 'package:verby_flutter/data/data_source/local/shared_preference_helper.dart';
 import 'package:verby_flutter/data/models/local/depa_restant_model.dart';
 import 'package:verby_flutter/data/models/local/employee_performs_state.dart';
+import 'package:verby_flutter/data/models/local/local_record.dart';
 import 'package:verby_flutter/data/models/remote/employee.dart';
 import 'package:verby_flutter/data/models/remote/record/CreateRecordRequest.dart';
 import 'package:verby_flutter/data/models/remote/record/depa_record.dart';
@@ -18,6 +20,8 @@ import 'package:verby_flutter/domain/use_cases/depa_restant/delete_depa_restants
 import 'package:verby_flutter/domain/use_cases/employee/delete_performance_state_use_case.dart';
 import 'package:verby_flutter/domain/use_cases/employee/get_emp_perform_state_by_id_use_case.dart';
 import 'package:verby_flutter/domain/use_cases/record/create_record_remotely__use_case.dart';
+import 'package:verby_flutter/domain/use_cases/record/insert_local_record_use_case.dart';
+import 'package:verby_flutter/domain/use_cases/sync/sync_data_use_case.dart';
 import 'package:verby_flutter/presentation/providers/usecase/depa_restant/delete_depa_restants_usecase_provider.dart';
 import 'package:verby_flutter/presentation/providers/usecase/employee/delete_emp_action_state_usecase_provider.dart';
 import 'package:verby_flutter/presentation/providers/usecase/employee/delete_emp_perform_state_usecase_provider.dart';
@@ -27,8 +31,11 @@ import 'package:verby_flutter/presentation/providers/usecase/employee/insert_emp
 import 'package:verby_flutter/presentation/providers/usecase/employee/insert_employee_perform_state_usecase.dart';
 
 import 'package:verby_flutter/presentation/providers/usecase/record/create__remote_record.dart';
+import 'package:verby_flutter/presentation/providers/usecase/record/insert_record_usecase_provider.dart';
+import 'package:verby_flutter/presentation/providers/usecase/sync/sync_data_use_case_provider.dart';
 
 import '../../data/models/local/employee_action_state.dart';
+import '../../data/models/remote/user_model.dart';
 import '../../domain/use_cases/employee/delete_action_state_use_case.dart';
 import '../../domain/use_cases/employee/get_emp_action_state_by_id_use_case.dart';
 import '../../domain/use_cases/employee/insert_emp_action_state.dart';
@@ -44,6 +51,8 @@ class EmpPerformAndActionStateNotifier
   final DeletePerformanceStateUseCase _deleteEmpPerformState;
   final DeleteActionStateUseCase _deleteEmpActionState;
   final DeleteDepaRestantsUseCase _deleteDepaRestantsUseCase;
+  final InsertLocalRecordUseCase _insertLocalRecordUseCase;
+  final SyncDataUseCase _syncDataUseCase;
 
   EmpPerformAndActionStateNotifier(
     this._insertEmpPerformState,
@@ -54,6 +63,8 @@ class EmpPerformAndActionStateNotifier
     this._deleteEmpPerformState,
     this._deleteEmpActionState,
     this._deleteDepaRestantsUseCase,
+    this._insertLocalRecordUseCase,
+    this._syncDataUseCase,
   ) : super(
         EmployeePerformAndActionState(
           isInternetConnected: ConnectivityHelper().isConnected,
@@ -82,29 +93,32 @@ class EmpPerformAndActionStateNotifier
     state = state.copyWith(message: message);
   }
 
-  Future<void> createRecord(
-    Employee employee,
-    Perform perform,
-    Action action,
-    List<DepaRestantModel?>? depa,
-    List<DepaRestantModel?>? restant,
-  ) async {
+  Future<void> syncData(Employee employee) async {
+    state = state.copyWith(isLoading: true);
     if (state.isInternetConnected) {
-      await createRecordOnServer(employee, perform, action, depa, restant);
+      UserModel? userModel = SharedPreferencesHelper(
+        await SharedPreferences.getInstance(),
+      ).getUser();
+      if (userModel != null) {
+        final result = await _syncDataUseCase.syncData(userModel, false);
+        if (result.isNotEmpty) {
+          print("syncData perform  ============> error message $result");
+          state = state.copyWith(errorMessage: result);
+        } else {
+          if (employee.id != null) {
+            await setCurrentPerformAndActionState(employee.id!);
+          }
+        }
+      }
     } else {
-      await createRecordLocally(employee, perform, action, depa, restant);
+      if (employee.id != null) {
+        await setCurrentPerformAndActionState(employee.id!);
+      }
     }
+    state = state.copyWith(isLoading: false);
   }
 
-  Future<void> createRecordLocally(
-    Employee employee,
-    Perform perform,
-    Action action,
-    List<DepaRestantModel?>? depa,
-    List<DepaRestantModel?>? restant,
-  ) async {}
-
-  Future<void> createRecordOnServer(
+  Future<bool> createRecord(
     Employee employee,
     Perform perform,
     Action action,
@@ -141,32 +155,69 @@ class EmpPerformAndActionStateNotifier
       depa: depaRecordList,
       restant: restantRecordList,
     );
+    String errorMessage = "";
+    if (state.isInternetConnected) {
+      errorMessage = await createRecordOnServer(recordRequest);
+    } else {
+      errorMessage = await createRecordLocally(recordRequest);
+    }
+    if (errorMessage.isNotEmpty) {
+      state = state.copyWith(errorMessage: errorMessage);
+      return false;
+    }
+    final empActionState = createEmployeeActionState(
+      time ?? "",
+      employee.id ?? -1,
+      action,
+    );
+    final empPerformState = createEmployeePerformState(
+      employee.id ?? -1,
+      perform,
+    );
+    await _insertEmpActionState.call(empActionState);
 
-    final result = await _createRecordRemotelyUseCase.call(recordRequest);
-    await result.fold(
-      (onError) {
+    if (action != Action.CHECKOUT) {
+      await _insertEmpPerformState.call(empPerformState);
+    } else {
+      _deleteEmpPerformState.call(employee.id.toString());
+    }
+    String successMessage = createSuccessMessage(empActionState, action);
+    state = state.copyWith(message: successMessage);
+    await deleteDepaRestants(depa, restant);
+    state = state.copyWith(isLoading: false, message: successMessage);
+    return true;
+  }
+
+  Future<String> createRecordLocally(CreateRecordRequest request) async {
+    try {
+      final result = await _insertLocalRecordUseCase.call(
+        LocalRecord(
+          id: DateTime.now().millisecondsSinceEpoch,
+          request: request,
+        ),
+      );
+      if (result) {
+        return "";
+      } else {
+        return "failed-to-process".tr();
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print(e);
+      }
+      return e.toString();
+    }
+  }
+
+  Future<String> createRecordOnServer(CreateRecordRequest request) async {
+    final result = await _createRecordRemotelyUseCase.call(request);
+    return await result.fold(
+      (onError) async {
         state = state.copyWith(isLoading: false, errorMessage: onError.message);
+        return onError.message;
       },
       (onData) async {
-        final empActionState = createEmployeeActionState(
-          time,
-          employee.id ?? -1,
-          action,
-        );
-        final empPerformState = createEmployeePerformState(
-          employee.id ?? -1,
-          perform,
-        );
-        await _insertEmpActionState.call(empActionState);
-
-        if (action != Action.CHECKOUT) {
-          await _insertEmpPerformState.call(empPerformState);
-        } else {
-          _deleteEmpPerformState.call(employee.id.toString());
-        }
-        await deleteDepaRestants(depa, restant);
-        String successMessage = createSuccessMessage(empActionState, action);
-        state = state.copyWith(isLoading: false, message: successMessage);
+        return "";
       },
     );
   }
@@ -217,7 +268,7 @@ class EmpPerformAndActionStateNotifier
     }
   }
 
-  void setCurrentPerformAndActionState(int employeeId) async {
+  Future<void> setCurrentPerformAndActionState(int employeeId) async {
     final empPerformStateResult = await _getEmpPerformStateById.call(
       employeeId.toString(),
     );
@@ -365,7 +416,9 @@ final empPerformAndActionStateProvider =
         deleteEmpPerformStateProvider,
       );
 
+      final insertRecordUseCase = ref.read(insertRecordUseCaseProvider);
       final deleteDepaRestantsUseCase = ref.read(deleteDepaRestantProvider);
+      final syncDataUseCase = ref.read(syncDataUseCaseProvider);
       return EmpPerformAndActionStateNotifier(
         insertEmpPerformState,
         insertEmpActionState,
@@ -375,5 +428,7 @@ final empPerformAndActionStateProvider =
         deleteEmpPerformStateUseCase,
         deleteEmpActionStateUseCase,
         deleteDepaRestantsUseCase,
+        insertRecordUseCase,
+        syncDataUseCase,
       );
     });

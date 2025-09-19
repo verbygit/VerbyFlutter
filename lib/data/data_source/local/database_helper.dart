@@ -36,14 +36,16 @@ class DatabaseHelper {
   static void _onCreate(Database db, int version) async {
     // Create employee table
     await db.execute('''
-    CREATE TABLE $TABLE_EMPLOYEE (
+    CREATE TABLE $TABLE_RECORD (
       id INTEGER PRIMARY KEY ,
-      name TEXT NOT NULL,  
-      surname TEXT NOT NULL,  
-      role INTEGER NOT NULL,  
-      api_monitoring INTEGER NOT NULL,  
-      pin TEXT NOT NULL,  
-      fullname TEXT NOT NULL
+      employee INTEGER NOT NULL,  
+      device INTEGER NOT NULL,  
+      action INTEGER NOT NULL,  
+      perform INTEGER NOT NULL,  
+      identity INTEGER NOT NULL,  
+      time TEXT NOT NULL,  
+      depa TEXT ,  
+      restant TEXT 
     )
   ''');
 
@@ -124,7 +126,41 @@ class DatabaseHelper {
     )
   ''');
   }
+  Future<bool> clearAllTablesExcept() async {
+    final db = await database;
+    try {
+      await db?.transaction((txn) async {
+        // Step 1: Query all table names (SQLite master table)
+        final List<Map<String, dynamic>> tablesResult = await txn.rawQuery(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';"
+        );
 
+        // Filter out excepted tables
+        final List<String> tablesToClear = tablesResult
+            .map((row) => row['name'] as String)
+            .toList();
+
+        if (tablesToClear.isEmpty) return;  // Nothing to clear
+
+        // Step 2: Batch DELETE for efficiency (no WHERE = delete all rows)
+        final Batch batch = txn.batch();
+        for (final tableName in tablesToClear) {
+          batch.rawDelete('DELETE FROM $tableName');
+        }
+        await batch.commit(noResult: true);  // Commit without checking row counts for speed
+        print('Cleared ${tablesToClear.length} tables successfully.');
+
+      });
+
+      // Optional: Reclaim space
+      await db?.rawQuery('VACUUM;');
+
+      return true;
+    } catch (e) {
+      print('Error clearing tables: $e');
+      return false;
+    }
+  }
   static void _onUpgrade(Database db, int oldVersion, int newVersion) async {
     // For development phase - no migration needed, fresh install will handle it
     print('ℹ️ Database version upgraded from $oldVersion to $newVersion');
