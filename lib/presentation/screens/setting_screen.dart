@@ -184,6 +184,7 @@ class _SettingScreen extends ConsumerState<SettingScreen> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: MColors().darkGrey,
+        automaticallyImplyLeading: false,
         centerTitle: true,
         title: Text(
           "setting".tr(),

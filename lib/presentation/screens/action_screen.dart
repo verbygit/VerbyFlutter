@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart' hide Action;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:lottie/lottie.dart';
 import 'package:verby_flutter/data/models/remote/employee.dart';
 import 'package:verby_flutter/domain/core/connectivity_helper.dart';
@@ -152,7 +153,7 @@ class _ActionScreen extends ConsumerState<ActionScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: MColors().darkGrey,
-
+        automaticallyImplyLeading: false,
         title: Center(
           child: Text(
             "chose_operation".tr(),
@@ -248,11 +249,10 @@ class _ActionScreen extends ConsumerState<ActionScreen> {
               height: double.infinity,
               color: Colors.black38,
               child: Center(
-                child: Lottie.asset(
-                  'assets/animation/loading_animation.json',
-                  width: 200,
-                  height: 200,
-                  fit: BoxFit.contain,
+                child: SpinKitCubeGrid(
+                  color: Colors.red,
+                  size: 100.0.r,
+                  duration: Duration(milliseconds: 800),
                 ),
               ),
             ),

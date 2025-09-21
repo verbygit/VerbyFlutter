@@ -174,7 +174,7 @@ class _WorkerScreen extends ConsumerState<WorkerScreen> {
             }
           }
         } else {
-          ref.read(loginProvider.notifier).setMessage("incorrect_pin".tr());
+          ref.read(workerScreenProvider.notifier).setErrorMessage("incorrect_pin".tr());
         }
       });
     } else {

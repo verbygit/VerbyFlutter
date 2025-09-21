@@ -4,7 +4,7 @@ class Pulse extends StatefulWidget {
   const Pulse({
     super.key,
     required this.child,
-    this.duration = const Duration(seconds: 1),
+    this.duration = const Duration(milliseconds: 800),
   });
 
   final Widget child;

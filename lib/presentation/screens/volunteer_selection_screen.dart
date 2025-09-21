@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:lottie/lottie.dart';
 import 'package:verby_flutter/presentation/providers/volunteer_screen_state_provider.dart';
 import '../theme/colors.dart';
@@ -164,11 +165,10 @@ class _VolunteerSelectionScreenState
                 height: double.infinity,
                 color: Colors.black38,
                 child: Center(
-                  child: Lottie.asset(
-                    'assets/animation/loading_animation.json',
-                    width: 200,
-                    height: 200,
-                    fit: BoxFit.contain,
+                  child: SpinKitCubeGrid(
+                    color: Colors.red,
+                    size: 100.0.r,
+                    duration: Duration(milliseconds: 800),
                   ),
                 ),
               ),
