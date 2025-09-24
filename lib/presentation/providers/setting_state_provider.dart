@@ -1,11 +1,99 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:verby_flutter/data/data_source/local/shared_preference_helper.dart';
+import 'package:verby_flutter/domain/use_cases/face/get_all_face_use_case.dart';
+import 'package:verby_flutter/presentation/providers/usecase/face/delete_face_use_case_provider.dart';
+import 'package:verby_flutter/presentation/providers/usecase/face/get_all_face_use_case_provider.dart';
+import 'package:verby_flutter/presentation/providers/usecase/face/is_face_exits_use_case_provider.dart';
+import 'package:verby_flutter/presentation/providers/usecase/sync/sync_data_use_case_provider.dart';
+import '../../domain/core/connectivity_helper.dart';
 import '../../domain/entities/states/setting_screen_state.dart';
+import '../../domain/use_cases/face/delete_face_use_case.dart';
+import '../../domain/use_cases/face/is_face_exists_use_case.dart';
+import '../../domain/use_cases/sync/sync_data_use_case.dart';
 
 class SettingStateProvider extends StateNotifier<SettingScreenState> {
-  SettingStateProvider() : super(SettingScreenState()) {
+  final IsFaceExistsUseCase _isFaceExistsUseCase;
+  final GetAllFaceUseCase _getAllFaceUseCase;
+  final DeleteFaceUseCase _deleteFaceUseCase;
+  final SyncDataUseCase _syncDataUseCase;
+
+  SettingStateProvider(
+    this._isFaceExistsUseCase,
+    this._getAllFaceUseCase,
+    this._deleteFaceUseCase,
+    this._syncDataUseCase,
+  ) : super(SettingScreenState(isInternetConnected:ConnectivityHelper().isConnected )) {
     setSharedPreferencesHelper();
+    getAllFaces();
+  }
+
+  void listenToInternetStatus() {
+    ConnectivityHelper().onStatusChange.listen((onData) {
+      if (onData == ConnectivityStatus.online) {
+        saveInternetStatus(true);
+      } else {
+        saveInternetStatus(false);
+      }
+    });
+  }
+
+  void saveInternetStatus(bool isConnected) {
+    state = state.copyWith(isInternetConnected: isConnected);
+  }
+
+  Future<bool> deleteFace(String empID) async {
+    final result = await _deleteFaceUseCase.call(empID);
+
+    return result.fold(
+      (onError) {
+        state = state.copyWith(errorMessage: onError);
+        return false;
+      },
+      (onData) {
+        return true;
+      },
+    );
+  }
+
+  void getAllFaces() async {
+    final result = await _getAllFaceUseCase.call();
+
+    print("Setting provider============>    $result");
+
+    result.fold(
+      (onError) => state = state.copyWith(faces: null),
+      (onData) => state = state.copyWith(faces: onData),
+    );
+  }
+
+  void syncData() async {
+    if (state.isInternetConnected) {
+      state = state.copyWith(isLoading: true);
+      final userModel = state.sharedPreferencesHelper?.getUser();
+      if (userModel != null && userModel.deviceID != null) {
+        final result = await _syncDataUseCase.syncData(userModel, true);
+        if (result.isNotEmpty) {
+          setErrorMessage(result);
+        }
+      }
+      state = state.copyWith(isLoading: false);
+    }else{
+      setErrorMessage("Internet is not available");
+    }
+  }
+
+  Future<bool> checkIsFaceExists(String emplID) async {
+    final result = await _isFaceExistsUseCase.call(emplID);
+    print("checkIsFaceExists============>    $result");
+    return await result.fold(
+      (onError) async {
+        return false;
+      },
+      (onData) async {
+        return onData;
+      },
+    );
   }
 
   void setSharedPreferencesHelper() async {
@@ -56,6 +144,16 @@ class SettingStateProvider extends StateNotifier<SettingScreenState> {
 final settingScreenStateProvider =
     StateNotifierProvider.autoDispose<SettingStateProvider, SettingScreenState>(
       (ref) {
-        return SettingStateProvider();
+        final isFaceExits = ref.read(isFaceExistsUseCaseProvider);
+        final getAllFacesUseCase = ref.read(getAllFacesUseCaseProvider);
+        final deleteFaceUseCase = ref.read(deleteFaceUseCaseProvider);
+        final syncDataUseCase = ref.read(syncDataUseCaseProvider);
+
+        return SettingStateProvider(
+          isFaceExits,
+          getAllFacesUseCase,
+          deleteFaceUseCase,
+          syncDataUseCase,
+        );
       },
     );

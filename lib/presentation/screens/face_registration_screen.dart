@@ -271,7 +271,7 @@ class _FaceRegistrationScreenState
                 await _saveFaceToDatabase(croppedFace);
                 
                 await Future.delayed(Duration(seconds: 1));
-                Navigator.pop(context);
+                Navigator.pop(context,true);
               } else {
                 _updateStatus('Failed to process face - please try again');
               }

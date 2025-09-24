@@ -68,9 +68,8 @@ class _AuthenticationDialogState extends ConsumerState<AuthenticationDialog> {
     }
     await ref.read(loginProvider.notifier).login(email, password);
 
-    Navigator.pop(context,true);
+    Navigator.pop(context, true);
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -90,12 +89,20 @@ class _AuthenticationDialogState extends ConsumerState<AuthenticationDialog> {
       });
     }
 
-    return WillPopScope(
-      onWillPop: () async {
-        if (!widget.shouldClearAllData) {
-          SystemNavigator.pop();
+    return PopScope(
+      canPop: false, // Prevent default pop behavior
+      onPopInvokedWithResult: (bool didPop, dynamic result) async {
+        print("onPopInvokedWithResult==============> $didPop ");
+        if (didPop) {
+          return; // If pop already occurred, do nothing
         }
-        return widget.shouldClearAllData;
+        if (!widget.shouldClearAllData) {
+          await SystemNavigator.pop(); // Exit the app
+        }
+        // If shouldClearAllData is true, allow manual pop
+        if (widget.shouldClearAllData && context.mounted) {
+          Navigator.of(context).pop();
+        }
       },
       child: Dialog(
         backgroundColor: Colors.white,

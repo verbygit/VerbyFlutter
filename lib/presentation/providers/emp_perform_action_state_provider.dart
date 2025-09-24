@@ -11,6 +11,7 @@ import 'package:verby_flutter/data/models/remote/employee.dart';
 import 'package:verby_flutter/data/models/remote/record/CreateRecordRequest.dart';
 import 'package:verby_flutter/data/models/remote/record/depa_record.dart';
 import 'package:verby_flutter/data/models/remote/record/restant_record.dart';
+import 'package:verby_flutter/data/service/backup_service.dart';
 import 'package:verby_flutter/domain/core/connectivity_helper.dart';
 import 'package:verby_flutter/domain/entities/action.dart';
 import 'package:verby_flutter/domain/entities/perform.dart';
@@ -20,6 +21,7 @@ import 'package:verby_flutter/domain/use_cases/depa_restant/delete_depa_restants
 import 'package:verby_flutter/domain/use_cases/employee/delete_performance_state_use_case.dart';
 import 'package:verby_flutter/domain/use_cases/employee/get_emp_perform_state_by_id_use_case.dart';
 import 'package:verby_flutter/domain/use_cases/record/create_record_remotely__use_case.dart';
+import 'package:verby_flutter/domain/use_cases/record/get_local_record_usecase.dart';
 import 'package:verby_flutter/domain/use_cases/record/insert_local_record_use_case.dart';
 import 'package:verby_flutter/domain/use_cases/sync/sync_data_use_case.dart';
 import 'package:verby_flutter/presentation/providers/usecase/depa_restant/delete_depa_restants_usecase_provider.dart';
@@ -31,6 +33,7 @@ import 'package:verby_flutter/presentation/providers/usecase/employee/insert_emp
 import 'package:verby_flutter/presentation/providers/usecase/employee/insert_employee_perform_state_usecase.dart';
 
 import 'package:verby_flutter/presentation/providers/usecase/record/create__remote_record.dart';
+import 'package:verby_flutter/presentation/providers/usecase/record/get_records_usecase_provider.dart';
 import 'package:verby_flutter/presentation/providers/usecase/record/insert_record_usecase_provider.dart';
 import 'package:verby_flutter/presentation/providers/usecase/sync/sync_data_use_case_provider.dart';
 
@@ -53,6 +56,7 @@ class EmpPerformAndActionStateNotifier
   final DeleteDepaRestantsUseCase _deleteDepaRestantsUseCase;
   final InsertLocalRecordUseCase _insertLocalRecordUseCase;
   final SyncDataUseCase _syncDataUseCase;
+  final GetLocalRecordUseCase getLocalRecordUseCase;
 
   EmpPerformAndActionStateNotifier(
     this._insertEmpPerformState,
@@ -65,6 +69,7 @@ class EmpPerformAndActionStateNotifier
     this._deleteDepaRestantsUseCase,
     this._insertLocalRecordUseCase,
     this._syncDataUseCase,
+    this.getLocalRecordUseCase,
   ) : super(
         EmployeePerformAndActionState(
           isInternetConnected: ConnectivityHelper().isConnected,
@@ -197,6 +202,10 @@ class EmpPerformAndActionStateNotifier
         ),
       );
       if (result) {
+        final records = await getLocalRecordUseCase.call();
+        await records.fold(((onError) async {}), (onData) async {
+          BackupService().saveRecordsWithBackup(onData);
+        });
         return "";
       } else {
         return "failed-to-process".tr();
@@ -415,7 +424,7 @@ final empPerformAndActionStateProvider =
       final deleteEmpPerformStateUseCase = ref.read(
         deleteEmpPerformStateProvider,
       );
-
+      final getRecordUseCase = ref.read(getRecordsUseCaseProvider);
       final insertRecordUseCase = ref.read(insertRecordUseCaseProvider);
       final deleteDepaRestantsUseCase = ref.read(deleteDepaRestantProvider);
       final syncDataUseCase = ref.read(syncDataUseCaseProvider);
@@ -430,5 +439,6 @@ final empPerformAndActionStateProvider =
         deleteDepaRestantsUseCase,
         insertRecordUseCase,
         syncDataUseCase,
+        getRecordUseCase,
       );
     });

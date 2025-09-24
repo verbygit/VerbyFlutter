@@ -13,6 +13,7 @@
   "num_of_retries": "Anzahl der Wiederholungen",
   "register_face_id": "Face ID registrieren",
   "edit_face_id": "Gesichts-ID bearbeiten",
+  "delete_face_id": "Face ID löschen",
   "enter_password": "Passwort eingeben",
   "incorrect_password": "Falsches Passwort",
   "click_here_to_repeat": "Klicken Sie hier, um es zu wiederholen",
@@ -46,6 +47,10 @@
   "yes": "Ja",
   "confirmation_text": "Möchten Sie wirklich fortfahren?",
   "record_sent_success": "Datensätze erfolgreich gesendet.",
-  "missing_face": "Fehlendes Gesicht! Bitte registrieren Sie Ihr Gesicht!"
+  "missing_face": "Fehlendes Gesicht! Bitte registrieren Sie Ihr Gesicht!",
+  "face_id_deleted": "Face ID gelöscht.",
+  "upload_archive_event": "Archivierte Datensätze hochladen.",
+  "missing_Face": "Fehlende Face ID, bitte registrieren Sie zuerst die Face ID.",
+
 
 }
