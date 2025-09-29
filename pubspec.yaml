@@ -61,16 +61,19 @@ dependencies:
   image: ^4.5.4
   google_mlkit_face_detection: ^0.13.1
   google_mlkit_commons: ^0.11.0
-  tflite_flutter: ^0.11.0
   flutter_secure_storage: ^9.0.0
 
   flutter_styled_toast: ^2.2.1
   flutter_spinkit: ^5.2.2
   circular_seek_bar: ^1.1.1
-#  archive: ^4.0.7
+  #  archive: ^4.0.7
   flutter_archive: ^6.0.3
   encrypt: ^5.0.1
   crypto: ^3.0.3
+  audioplayers: ^6.1.0
+  firebase_core: ^4.1.1
+  firebase_crashlytics: ^5.0.2
+  tflite_flutter: ^0.11.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -101,7 +104,8 @@ flutter:
     - assets/langs/
     - assets/svg/
     - assets/animation/
-    - assets/mobile_face_net.tflite
+    - assets/sound/
+    - assets/model/model.tflite
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

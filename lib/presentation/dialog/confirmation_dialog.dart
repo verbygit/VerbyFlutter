@@ -50,6 +50,7 @@ class ConfirmationDialog extends ConsumerWidget {
                       ),
                     ),
                   ),
+                  10.horizontalSpace,
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () {

@@ -16,6 +16,7 @@ class SharedPreferencesHelper {
   static final String DEVICE_ID_KEY = "device_id";
   static final String TOKEN_KEY = "token";
   final String USER_PASSWORD = "user_password";
+  final String FACE_TRIES = "face_tries";
   final String IS_FACE_ID_FOR_ALL_KEY = "face_id_for_all";
   final String IS_FACE_ID_FOR_REGISTER_FACE_KEY = "face_id_for_register_face";
   final key = encrypt.Key.fromUtf8(
@@ -56,6 +57,14 @@ class SharedPreferencesHelper {
   Future<void> remove(String key) async {
     await _sharedPreferences.remove(key);
   }
+
+  Future<void> setFaceVerificationTries(double value) async {
+    await _sharedPreferences.setDouble(FACE_TRIES, value);
+  }
+
+  Future<double?> getFaceTries() async =>
+      _sharedPreferences.getDouble(FACE_TRIES);
+
 
   Future<void> setFaceIdForAll(bool value) async {
     await _sharedPreferences.setBool(IS_FACE_ID_FOR_ALL_KEY, value);

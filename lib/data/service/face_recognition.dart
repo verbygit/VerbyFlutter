@@ -1,8 +1,10 @@
 // lib/services/face_recognition.dart
 import 'dart:math' as math;
-import 'dart:typed_data';
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:tflite_flutter/tflite_flutter.dart' as tfl;
 import 'package:image/image.dart' as imglib;
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 
 import '../../domain/entities/face/recognition.dart';
 
@@ -16,49 +18,264 @@ class FaceRecognition {
   List<Recognition> registered = [];
 
   FaceRecognition() {
-    _loadModel().then((_) {
-      // Test the model after loading
-      Future.delayed(Duration(seconds: 2), () {
-        testTFLiteModel();
+    // Add longer delay for iOS release builds to ensure proper initialization
+    Future.delayed(Duration(milliseconds: 2000), () {
+      _loadModel().catchError((error) {
+        // Log to Crashlytics with detailed error information
+        FirebaseCrashlytics.instance.recordError(
+          error,
+          StackTrace.current,
+          reason: 'TFLite model loading failed in constructor',
+          fatal: false,
+          information: [
+            'Model path: assets/model/model.tflite',
+            'Input size: $inputSize',
+            'Output size: $outputSize',
+            'Is quantized: $isModelQuantized',
+            'Platform: iOS',
+          ],
+        );
       });
     });
   }
 
   Future<void> _loadModel() async {
     try {
-      final options = tfl.InterpreterOptions()..threads = 4;
-      print('Attempting to load TFLite model...');
+      // Use the correct asset path from pubspec.yaml
+      const modelPath = 'assets/model/model.tflite';
       
-      // Try multiple asset paths
-      List<String> assetPaths = [
-        'assets/mobile_face_net.tflite',
-        'mobile_face_net.tflite',
-        'assets/mobile_face_net.tflite'
-      ];
+      // Log start of model loading to Crashlytics
+      FirebaseCrashlytics.instance.recordError(
+        Exception('Starting TFLite model loading'),
+        StackTrace.current,
+        reason: 'TFLite model loading initiated',
+        fatal: false,
+        information: [
+          'Model path: $modelPath',
+          'Platform: iOS Release',
+          'Timestamp: ${DateTime.now().toIso8601String()}',
+        ],
+      );
       
-      for (String path in assetPaths) {
+      // Verify asset exists and is accessible
+      try {
+        final assetBundle = await _getAssetBundle();
+        final data = await assetBundle.load(modelPath);
+        
+        // Log asset loading success
+        FirebaseCrashlytics.instance.recordError(
+          Exception('Asset loaded successfully'),
+          StackTrace.current,
+          reason: 'Asset file accessible',
+          fatal: false,
+          information: [
+            'Asset size: ${data.lengthInBytes} bytes',
+            'Model path: $modelPath',
+          ],
+        );
+        
+        if (data.lengthInBytes < 1000) {
+          throw Exception('Asset file too small (${data.lengthInBytes} bytes) - likely corrupted');
+        }
+      } catch (assetError) {
+        // Log asset loading failure
+        FirebaseCrashlytics.instance.recordError(
+          assetError,
+          StackTrace.current,
+          reason: 'Asset file not accessible',
+          fatal: false,
+          information: [
+            'Model path: $modelPath',
+            'Asset error: $assetError',
+          ],
+        );
+        throw Exception('Asset file not accessible: $assetError');
+      }
+      
+      // Create interpreter options
+      final options = tfl.InterpreterOptions();
+      
+      // iOS-specific model loading with multiple strategies
+      bool modelLoaded = false;
+      Exception? lastError;
+      
+      for (int strategyIndex = 0; strategyIndex < 5; strategyIndex++) {
         try {
-          print('Trying path: $path');
-          _interpreter = await tfl.Interpreter.fromAsset(path, options: options);
-          print('✅ TFLite model loaded successfully from: $path');
-          return; // Exit if successful
+          // Log each strategy attempt
+          FirebaseCrashlytics.instance.recordError(
+            Exception('Trying loading strategy ${strategyIndex + 1}'),
+            StackTrace.current,
+            reason: 'TFLite loading strategy attempt',
+            fatal: false,
+            information: [
+              'Strategy: ${strategyIndex + 1}',
+              'Model path: $modelPath',
+            ],
+          );
+          
+          if (strategyIndex == 1) {
+            // Strategy 2: Add delay for iOS release builds
+            await Future.delayed(Duration(milliseconds: 2000));
+          } else if (strategyIndex == 2) {
+            // Strategy 3: Force garbage collection for iOS
+            await Future.delayed(Duration(milliseconds: 1000));
+            // Force memory cleanup
+            for (int i = 0; i < 5; i++) {
+              await Future.delayed(Duration(milliseconds: 200));
+            }
+          } else if (strategyIndex == 3) {
+            // Strategy 4: Try with different asset bundle approach
+            await Future.delayed(Duration(milliseconds: 3000));
+          } else if (strategyIndex == 4) {
+            // Strategy 5: Final attempt with maximum delay
+            await Future.delayed(Duration(milliseconds: 5000));
+          }
+          
+          _interpreter = await tfl.Interpreter.fromAsset(modelPath, options: options);
+          modelLoaded = true;
+          
+          // Log successful loading
+          FirebaseCrashlytics.instance.recordError(
+            Exception('Model loaded successfully with strategy ${strategyIndex + 1}'),
+            StackTrace.current,
+            reason: 'TFLite model loading success',
+            fatal: false,
+            information: [
+              'Strategy used: ${strategyIndex + 1}',
+              'Model path: $modelPath',
+            ],
+          );
+          break;
+          
         } catch (e) {
-          print('❌ Failed to load from $path: $e');
+          lastError = e is Exception ? e : Exception(e.toString());
+          // Reset interpreter for next attempt
+          _interpreter = null;
+          
+          // Log strategy failure
+          FirebaseCrashlytics.instance.recordError(
+            lastError,
+            StackTrace.current,
+            reason: 'TFLite loading strategy ${strategyIndex + 1} failed',
+            fatal: false,
+            information: [
+              'Strategy: ${strategyIndex + 1}',
+              'Error: $e',
+              'Model path: $modelPath',
+            ],
+          );
+          
+          if (strategyIndex < 4) {
+            await Future.delayed(Duration(milliseconds: 2000));
+          }
         }
       }
       
-      print('❌ All asset paths failed. Model not loaded.');
+      if (!modelLoaded) {
+        // Log all strategies failed
+        FirebaseCrashlytics.instance.recordError(
+          lastError ?? Exception('All loading strategies failed'),
+          StackTrace.current,
+          reason: 'All TFLite loading strategies failed',
+          fatal: false,
+          information: [
+            'Model path: $modelPath',
+            'Last error: ${lastError?.toString()}',
+            'Total strategies attempted: 5',
+          ],
+        );
+        throw Exception('All loading strategies failed: ${lastError?.toString()}');
+      }
+      
+      // Test the model immediately after loading
+      await _testModelAfterLoading();
+      
+    } catch (e, stackTrace) {
+      // Log detailed error to Crashlytics
+      FirebaseCrashlytics.instance.recordError(
+        e,
+        stackTrace,
+        reason: 'TFLite model loading failed on iOS release',
+        fatal: false,
+        information: [
+          'Model path: assets/model/model.tflite',
+          'Input size: $inputSize',
+          'Output size: $outputSize',
+          'Model quantized: $isModelQuantized',
+          'Error type: ${e.runtimeType}',
+          'Error message: $e',
+          'Platform: iOS Release',
+          'Build mode: Release',
+        ],
+      );
+      
+      _interpreter = null;
+    }
+  }
+  
+  Future<AssetBundle> _getAssetBundle() async {
+    // For iOS, we need to use the root bundle directly
+    return rootBundle;
+  }
+
+  Future<void> _testModelAfterLoading() async {
+    try {
+      // Create a test image (112x112 pixels)
+      var testImage = imglib.Image(width: 112, height: 112);
+      for (int y = 0; y < 112; y++) {
+        for (int x = 0; x < 112; x++) {
+          testImage.setPixelRgb(x, y, 128, 128, 128); // Gray color
+        }
+      }
+      
+      var embedding = extractEmbedding(testImage);
+      if (embedding == null) {
+        throw Exception('Model test failed - embedding extraction returned null');
+      }
     } catch (e) {
-      print('❌ Critical error in _loadModel: $e');
+      throw Exception('Model test failed: $e');
     }
   }
 
   List<double>? extractEmbedding(imglib.Image image) {
-    if (_interpreter == null) return null;
-    var input = _preProcess(image);
-    var output = List.generate(1, (_) => List.filled(outputSize, 0.0));
-    _interpreter!.run(input, output);
-    return output[0];
+    if (_interpreter == null) {
+      // Log TFLite interpreter not loaded to Crashlytics
+      FirebaseCrashlytics.instance.recordError(
+        Exception('TFLite interpreter is null during embedding extraction'),
+        StackTrace.current,
+        reason: 'TFLite interpreter not loaded',
+        fatal: false,
+        information: [
+          'Image size: ${image.width}x${image.height}',
+          'Input size required: $inputSize',
+          'Output size: $outputSize',
+          'Model loaded: false',
+        ],
+      );
+      return null;
+    }
+    
+    try {
+      var input = _preProcess(image);
+      var output = List.generate(1, (_) => List.filled(outputSize, 0.0));
+      _interpreter!.run(input, output);
+      return output[0];
+    } catch (e) {
+      // Log TFLite inference error to Crashlytics
+      FirebaseCrashlytics.instance.recordError(
+        e,
+        StackTrace.current,
+        reason: 'TFLite inference failed during embedding extraction',
+        fatal: false,
+        information: [
+          'Image size: ${image.width}x${image.height}',
+          'Input size: $inputSize',
+          'Output size: $outputSize',
+          'Interpreter loaded: ${_interpreter != null}',
+        ],
+      );
+      return null;
+    }
   }
 
   dynamic _preProcess(imglib.Image image) {
@@ -78,24 +295,17 @@ class FaceRecognition {
   Recognition? recognize(imglib.Image image) {
     var embedding = extractEmbedding(image);
     if (embedding == null) {
-      print('❌ Failed to extract embedding from image');
       return null;
     }
     
     var nearest = _findNearest(embedding);
     if (nearest != null) {
       double distance = nearest.$2;
-      print('🔍 Nearest face found - Distance: ${distance.toStringAsFixed(3)}');
       
       // Balanced threshold for good security and usability
       if (distance < 1.2) { // Adjusted to 1.2 for better usability while maintaining security
-        print('✅ Face recognized with high confidence');
         return Recognition(nearest.$1.id, nearest.$1.name, distance, []);
-      } else {
-        print('❌ Face distance too high: ${distance.toStringAsFixed(3)} (threshold: 1.2)');
       }
-    } else {
-      print('❌ No registered faces found for comparison');
     }
     return null;
   }
@@ -120,8 +330,6 @@ class FaceRecognition {
   }
 
   bool addFace(String name, int id, imglib.Image image) {
-    print('📝 Adding face for: $name (ID: $id)');
-    
     var embedding = extractEmbedding(image);
     if (embedding != null) {
       // Validate embedding quality
@@ -129,16 +337,52 @@ class FaceRecognition {
         // Check for duplicate faces
         if (!_hasDuplicateFace(id)) {
           registered.add(Recognition(id, name, -1.0, embedding));
-          print('✅ Face added successfully for: $name');
           return true;
         } else {
-          print('❌ Face already registered for ID: $id');
+          // Log duplicate face registration attempt to Crashlytics
+          FirebaseCrashlytics.instance.recordError(
+            Exception('Duplicate face registration attempt'),
+            StackTrace.current,
+            reason: 'Face already registered for employee ID',
+            fatal: false,
+            information: [
+              'Employee ID: $id',
+              'Employee Name: $name',
+              'Image size: ${image.width}x${image.height}',
+              'Registered faces count: ${registered.length}',
+            ],
+          );
         }
       } else {
-        print('❌ Embedding quality too low for: $name');
+        // Log embedding quality failure to Crashlytics
+        FirebaseCrashlytics.instance.recordError(
+          Exception('Face embedding quality validation failed'),
+          StackTrace.current,
+          reason: 'Embedding quality too low for face registration',
+          fatal: false,
+          information: [
+            'Employee ID: $id',
+            'Employee Name: $name',
+            'Image size: ${image.width}x${image.height}',
+            'Embedding length: ${embedding.length}',
+            'Embedding sum: ${embedding.fold(0.0, (a, b) => a + b.abs())}',
+          ],
+        );
       }
     } else {
-      print('❌ Failed to extract embedding for: $name');
+      // Log embedding extraction failure to Crashlytics
+      FirebaseCrashlytics.instance.recordError(
+        Exception('Failed to extract face embedding'),
+        StackTrace.current,
+        reason: 'Face embedding extraction failed',
+        fatal: false,
+        information: [
+          'Employee ID: $id',
+          'Employee Name: $name',
+          'Image size: ${image.width}x${image.height}',
+          'TFLite interpreter loaded: ${_interpreter != null}',
+        ],
+      );
     }
     return false;
   }
@@ -174,21 +418,12 @@ class FaceRecognition {
   }
   
   void printRegistrationStats() {
-    print('📊 Face Registration Statistics:');
-    print('   Total registered faces: ${registered.length}');
-    print('   TFLite interpreter loaded: ${_interpreter != null}');
-    print('   Output size: $outputSize');
-    
-    for (var rec in registered) {
-      print('   - ID: ${rec.id}, Name: ${rec.name}');
-    }
+    // This method is kept for compatibility but print statements removed for release builds
   }
   
   // Test method to verify TFLite is working
   void testTFLiteModel() {
-    print('🧪 Testing TFLite Model...');
     if (_interpreter == null) {
-      print('❌ Interpreter is null');
       return;
     }
     
@@ -200,20 +435,34 @@ class FaceRecognition {
       }
     }
     
-    print('📸 Test image created: ${testImage.width}x${testImage.height}');
-    
     try {
       var embedding = extractEmbedding(testImage);
-      if (embedding != null) {
-        print('✅ TFLite embedding extraction successful!');
-        print('   Embedding length: ${embedding.length}');
-        print('   First 5 values: ${embedding.take(5).toList()}');
-      } else {
-        print('❌ TFLite embedding extraction failed');
-      }
+      // Test completed - embedding extraction tested
     } catch (e) {
-      print('❌ Error during TFLite test: $e');
+      // Test failed - error handled by extractEmbedding method
     }
+  }
+
+  bool isModelLoaded() {
+    return _interpreter != null;
+  }
+  
+  Future<bool> waitForModelLoading({int timeoutSeconds = 10}) async {
+    int attempts = 0;
+    final maxAttempts = timeoutSeconds * 2; // Check every 500ms
+    
+    while (_interpreter == null && attempts < maxAttempts) {
+      await Future.delayed(Duration(milliseconds: 500));
+      attempts++;
+    }
+    
+    return _interpreter != null;
+  }
+  
+  Future<bool> retryModelLoading() async {
+    _interpreter = null; // Reset interpreter
+    await _loadModel();
+    return _interpreter != null;
   }
 
   void removeFace() {

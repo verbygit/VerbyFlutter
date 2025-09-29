@@ -1,4 +1,5 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -145,11 +146,11 @@ class _WorkerScreen extends ConsumerState<WorkerScreen> {
         .read(workerScreenProvider.notifier)
         .getEmployeeById(int.parse(employeeIDController.text));
     if (employee != null) {
+      employeeIDController.text = "";
       showPinDialog(context, employee, (onPinSuccess) async {
         if (onPinSuccess) {
           Widget? widget;
-          if (ref.read(workerScreenProvider).isFaceIdForAll ||
-              ref.read(workerScreenProvider).isFaceForRegisterFace) {
+          if (ref.read(workerScreenProvider).isFaceIdForAll) {
             final face = await ref
                 .read(workerScreenProvider.notifier)
                 .getFaceByEmpId(employee.id ?? -1);
@@ -157,6 +158,16 @@ class _WorkerScreen extends ConsumerState<WorkerScreen> {
               ref
                   .read(workerScreenProvider.notifier)
                   .setErrorMessage("missing_face".tr());
+            } else {
+              widget = FaceVerificationScreen(employee: employee);
+            }
+          } else if (ref.read(workerScreenProvider).isFaceForRegisterFace) {
+            final face = await ref
+                .read(workerScreenProvider.notifier)
+                .getFaceByEmpId(employee.id ?? -1);
+
+            if (face == null) {
+              widget = SelectOperationScreen(employee: employee);
             } else {
               widget = FaceVerificationScreen(employee: employee);
             }
@@ -174,7 +185,9 @@ class _WorkerScreen extends ConsumerState<WorkerScreen> {
             }
           }
         } else {
-          ref.read(workerScreenProvider.notifier).setErrorMessage("incorrect_pin".tr());
+          ref
+              .read(workerScreenProvider.notifier)
+              .setErrorMessage("incorrect_pin".tr());
         }
       });
     } else {
@@ -365,7 +378,9 @@ class _WorkerScreen extends ConsumerState<WorkerScreen> {
                               ),
                             ),
                             IconButton(
-                              onPressed: () {},
+                              onPressed: () {
+                                FirebaseCrashlytics.instance.log("Lock button pressed");
+                              },
                               icon: SvgPicture.asset(
                                 'assets/svg/ic_lock_open.svg',
                                 colorFilter: ColorFilter.mode(

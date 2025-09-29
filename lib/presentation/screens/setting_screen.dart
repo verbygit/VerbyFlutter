@@ -237,6 +237,42 @@ class _SettingScreen extends ConsumerState<SettingScreen> {
     }
   }
 
+  Future<void> _uploadArchiveEvent() async {
+    await ref.read(settingScreenStateProvider.notifier).uploadArchive();
+  }
+
+  void _showUploadSuccessDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Upload Successful", style: TextStyle(color: Colors.green)),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text("OK"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showUploadErrorDialog(String error) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Upload Failed"),
+        content: Text(error),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text("OK"),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(settingScreenStateProvider);
@@ -244,6 +280,11 @@ class _SettingScreen extends ConsumerState<SettingScreen> {
     ref.listen(settingScreenStateProvider, (previous, next) {
       if (next.errorMessage.isNotEmpty) {
         showErrorSnackBar(next.errorMessage, context);
+        ref.read(settingScreenStateProvider.notifier).setErrorMessage('');
+      }
+      if (next.message.isNotEmpty) {
+        showSnackBar(next.errorMessage, context);
+        ref.read(settingScreenStateProvider.notifier).setMessage('');
       }
     });
     return Scaffold(
@@ -354,7 +395,16 @@ class _SettingScreen extends ConsumerState<SettingScreen> {
                           ),
                         ),
                       ),
-                      FancySeekBar(value: 6, max: 9, min: 3),
+                      FancySeekBar(
+                        value: state.faceVerificationTries ?? 6,
+                        max: 9,
+                        min: 3,
+                        onChanged: (value) {
+                          ref
+                              .read(settingScreenStateProvider.notifier)
+                              .setFaceTries(value);
+                        },
+                      ),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
@@ -451,7 +501,7 @@ class _SettingScreen extends ConsumerState<SettingScreen> {
                             backgroundColor: Colors.white,
                           ),
 
-                          onPressed: () {},
+                          onPressed: _uploadArchiveEvent,
                           child: Padding(
                             padding: EdgeInsets.all(12.w),
                             child: Text(
@@ -462,47 +512,7 @@ class _SettingScreen extends ConsumerState<SettingScreen> {
                         ),
                       ),
 
-                      10.verticalSpace,
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 10.w),
-                        child: Divider(
-                          height: 0.5,
-                          thickness: 0.5,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      20.verticalSpace,
-                      Padding(
-                        padding: EdgeInsets.all(10.w),
-                        child: Text(
-                          "Debug Tools",
-                          style: TextStyle(
-                            color: Colors.red,
-                            fontSize: 16.sp,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      Container(
-                        width: double.infinity,
-                        padding: EdgeInsets.all(10.w),
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(6.w),
-                            ),
-                          ),
-                          onPressed: () => _showDeleteAllFacesDialog(context),
-                          child: Padding(
-                            padding: EdgeInsets.all(12.w),
-                            child: Text(
-                              "Delete All Faces (Debug)",
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          ),
-                        ),
-                      ),
+                      30.verticalSpace,
                     ],
                   ),
                 ),

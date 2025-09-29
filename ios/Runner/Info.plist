@@ -51,8 +51,14 @@
 	<string>This app needs camera access for face recognition and verification.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>This app needs microphone access for camera recording during face recognition.</string>
-
 	
+	<!-- Photo Library Access (required by dependencies like file_picker) -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app uses file picker functionality that may access photo library for file selection.</string>
+	
+	<!-- Documents Access -->
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>This app needs access to documents folder for backup and restore operations.</string>
 
 </dict>
 </plist>

@@ -63,18 +63,125 @@ class SyncDataUseCase {
       return employeesResponse;
     }
     List<Employee> employees = employeesResponse as List<Employee>;
-
-    String planError = await getPlansAndSave(userModel, employees);
-    String depaRestantAndEmpStateError = await getDepaRestantAndEmployeesStates(
-      userModel,
-      employees,
-    );
+    // Run both calls in parallel
+    final results = await Future.wait([
+      getPlansAndSave(userModel, employees),
+      getDepaRestantAndEmployeesStates(userModel, employees),
+    ]);
+    String planError = results[0];
+    String depaRestantAndEmpStateError = results[1];
 
     if (planError.isNotEmpty || depaRestantAndEmpStateError.isNotEmpty) {
       return " Plan error: $planError , DepaRestantAndEmpState error: $depaRestantAndEmpStateError";
-    }else{
-      return"";
+    } else {
+      return "";
     }
+  }
+
+  Future<String> syncSingleEmpData(UserModel userModel, int empId) async {
+    List<String> error = [];
+
+    // Run all three async calls in parallel using Future.wait
+    final results = await Future.wait([
+      getPlanForEmp(userModel, empId),
+      getDepaRestantForEmp(userModel, empId),
+      getEmpActionAndPerformState(empId),
+    ]);
+
+    // Collect errors from the results
+    for (var result in results) {
+      if (result.isNotEmpty) {
+        error.add(result);
+      }
+    }
+
+    // Join errors if any, otherwise return empty string
+    return error.isNotEmpty ? error.join(", ") : "";
+  }
+
+  Future<String> getPlanForEmp(UserModel userModel, int empId) async {
+    final planResult = await _getPlanUseCase.call(
+      userModel.deviceID.toString(),
+      empId,
+    );
+    return planResult.fold(
+      (onError) async {
+        return onError.message;
+      }, // Return error as a list
+      (onData) async {
+        final plan = Plan(employeeId: empId, time: onData);
+        await _insertPlansUseCase.call([plan]);
+        return ""; // Return empty list for success
+      },
+    );
+  }
+
+  Future<String> getEmpActionAndPerformState(int empId) async {
+    final resultRecords = await _getRecordFromServerUseCase.call(empId);
+
+    return await resultRecords.fold(
+      (onError) async {
+        return onError.message;
+      },
+      (onData) async {
+        final lastRecords = onData.lastRecords;
+        if (lastRecords != null && lastRecords.isNotEmpty) {
+          final empActionState = createEmployeeActionState(onData);
+          await _insertEmpActionState.call([empActionState]);
+
+          if (Action.getAction(lastRecords.first.action ?? -1) !=
+              Action.CHECKOUT) {
+            final empPerformState = createEmployeePerformState(
+              lastRecords.first,
+            );
+            await _insertEmpPerformStateUseCase.call([empPerformState]);
+          }
+        }
+        return "";
+      },
+    );
+  }
+
+  Future<String> getDepaRestantForEmp(UserModel userModel, int empId) async {
+    final depaResult = await _getDepaRestantsUseCase.call(
+      userModel.deviceID.toString(),
+      empId,
+    );
+
+    return await depaResult.fold(
+      (onError) async {
+        return onError.message;
+      },
+      (onData) async {
+        final depaList = onData.depa
+            ?.map(
+              (e) => e.toDepaRestantModel(
+                empId.toString(),
+                true,
+                RoomStatus.CLEANED.getRoomStatusValue(),
+              ),
+            )
+            .toList();
+        final restantList = onData.restant
+            ?.map(
+              (e) => e.toDepaRestantModel(
+                empId.toString(),
+                false,
+                RoomStatus.CLEANED.getRoomStatusValue(),
+              ),
+            )
+            .toList();
+        final List<DepaRestantModel> depaRestants = [];
+
+        if (depaList != null) depaRestants.addAll(depaList);
+        if (restantList != null) depaRestants.addAll(restantList);
+
+        if (depaRestants.isNotEmpty) {
+          await _insertDepaRestantsUseCase.call(depaRestants);
+        }
+        return "";
+      },
+    );
   }
 
   Future<dynamic> getLocalEmployees() async {

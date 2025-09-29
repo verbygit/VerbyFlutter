@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:dartz/dartz.dart';
 import 'package:encrypt/encrypt.dart';
 import 'package:flutter_archive/flutter_archive.dart';
 import 'package:file_picker/file_picker.dart';
@@ -13,6 +14,7 @@ import 'package:pointycastle/key_derivators/pbkdf2.dart';
 import 'package:pointycastle/macs/hmac.dart';
 import 'package:pointycastle/digests/sha256.dart';
 import 'package:verby_flutter/data/models/remote/record/CreateRecordRequest.dart';
+import 'package:verby_flutter/utils/storage_permission_helper.dart';
 
 class BackupService {
   static const String _backupPassword =
@@ -46,9 +48,7 @@ class BackupService {
   }
 
   // Create simple ZIP file (no encryption for testing)
-  Future<Uint8List> _createSimpleZip(
-    List<Map<String, dynamic>> records,
-  ) async {
+  Future<Uint8List> _createSimpleZip(List<Map<String, dynamic>> records) async {
     // Convert records to JSON string
     final jsonString = jsonEncode(records);
 
@@ -145,9 +145,9 @@ class BackupService {
   // Android: Save to Downloads directory
   Future<bool> _saveToAndroid(Uint8List zipData) async {
     try {
-      // Request storage permission
-      if (!await Permission.storage.request().isGranted) {
-        print('Storage permission denied');
+      // Check storage permission using the helper
+      if (!await StoragePermissionHelper.checkStoragePermission()) {
+        print('Storage permission not available');
         return false;
       }
 
@@ -194,6 +194,251 @@ class BackupService {
       return false;
     }
   }
+
+  // Upload/Import functionality
+  Future<List<CreateRecordRequest>?> uploadAndExtractRecords() async {
+    try {
+      // Pick ZIP file based on platform
+      String? filePath;
+      if (Platform.isAndroid) {
+        filePath = await _pickFileFromAndroid();
+      } else if (Platform.isIOS) {
+        filePath = await _pickFileFromIOS();
+      } else {
+        print('Unsupported platform');
+        return null;
+      }
+
+      if (filePath == null) {
+        print('No file selected');
+        return null;
+      }
+
+      // Extract and parse records from ZIP
+      return await _extractRecordsFromZip(filePath);
+    } catch (e) {
+      print('Error in uploadAndExtractRecords: $e');
+      return null;
+    }
+  }
+
+  // Android: Pick ZIP file from Documents external directory
+  Future<String?> _pickFileFromAndroid() async {
+    try {
+      // Check storage permission using the helper
+      if (!await StoragePermissionHelper.checkStoragePermission()) {
+        print('Storage permission not available');
+        return null;
+      }
+
+      // Use file_picker to select from Documents directory
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['zip'],
+        allowMultiple: false,
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+        if (file.path != null) {
+          // Verify it's a ZIP file
+          if (file.extension?.toLowerCase() == 'zip') {
+            print('Android: File selected, cached at: ${file.path}');
+
+            // Check if it's our expected backup file
+            if (file.name == _backupFileName) {
+              print(
+                'Confirmed: This is our backup file, original will be deleted after processing',
+              );
+            } else {
+              print(
+                'Note: Different filename detected, original file deletion may not work',
+              );
+            }
+
+            return file.path;
+          } else {
+            print('Selected file is not a ZIP file');
+            return null;
+          }
+        }
+      }
+
+      print('No file selected');
+      return null;
+    } catch (e) {
+      print('Error picking file from Android: $e');
+      return null;
+    }
+  }
+
+  // iOS: Pick ZIP file from Downloads folder
+  Future<String?> _pickFileFromIOS() async {
+    try {
+      // Use file_picker to select ZIP file
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['zip'],
+        allowMultiple: false,
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+        if (file.path != null) {
+          // Verify it's a ZIP file
+          if (file.extension?.toLowerCase() == 'zip') {
+            print(
+              'iOS: File selected from Files app, copied to temp location: ${file.path}',
+            );
+            print(
+              'Note: Original file in Files app will remain (iOS limitation)',
+            );
+            return file.path;
+          } else {
+            print('Selected file is not a ZIP file');
+            return null;
+          }
+        }
+      }
+
+      print('No file selected');
+      return null;
+    } catch (e) {
+      print('Error picking file from iOS: $e');
+      return null;
+    }
+  }
+
+  // Extract records from ZIP file
+  Future<List<CreateRecordRequest>?> _extractRecordsFromZip(
+    String zipFilePath,
+  ) async {
+    try {
+      final zipFile = File(zipFilePath);
+      if (!await zipFile.exists()) {
+        print('ZIP file does not exist: $zipFilePath');
+        return null;
+      }
+
+      // Create temp directory for extraction
+      final tempDir = await getTemporaryDirectory();
+      final extractDir = Directory(
+        path.join(
+          tempDir.path,
+          'extracted_${DateTime.now().millisecondsSinceEpoch}',
+        ),
+      );
+
+      if (!await extractDir.exists()) {
+        await extractDir.create(recursive: true);
+      }
+
+      // Extract ZIP file
+      await ZipFile.extractToDirectory(
+        zipFile: zipFile,
+        destinationDir: extractDir,
+      );
+
+      // Look for JSON file in extracted contents
+      final jsonFile = await _findJsonFile(extractDir);
+      if (jsonFile == null) {
+        print('No JSON file found in ZIP archive');
+        // Clean up temp directory on error
+        await extractDir.delete(recursive: true);
+        return null;
+      }
+
+      // Read and parse JSON
+      final jsonString = await jsonFile.readAsString();
+      final List<dynamic> jsonList = jsonDecode(jsonString);
+
+      // Convert to CreateRecordRequest objects
+      final List<CreateRecordRequest> records = jsonList
+          .map((json) => CreateRecordRequest.fromJson(json))
+          .toList();
+
+      // Clean up temp directory
+      await extractDir.delete(recursive: true);
+
+      // Delete the temporary ZIP file after successful extraction
+      try {
+        await zipFile.delete();
+        print('Temporary ZIP file deleted successfully: $zipFilePath');
+
+        // On Android, also try to delete the original file from Documents directory
+        // if (Platform.isAndroid) {
+        //   await _deleteOriginalAndroidFile();
+        // }
+        //
+        // On iOS, explain that original file in Files app remains
+        if (Platform.isIOS) {
+          print(
+            'Note: Original file in Files app/iCloud remains untouched (iOS security limitation)',
+          );
+          print(
+            'Users can manually delete the original file from Files app if desired',
+          );
+        }
+      } catch (deleteError) {
+        print('Warning: Could not delete temporary ZIP file: $deleteError');
+        print('File path: $zipFilePath');
+
+        // On iOS, this might happen due to sandbox restrictions
+        if (Platform.isIOS) {
+          print('Note: iOS may restrict file deletion in certain directories');
+        }
+
+        // Don't fail the operation if file deletion fails
+      }
+
+      print('Successfully extracted ${records.length} records from ZIP file');
+      return records;
+    } catch (e) {
+      print('Error extracting records from ZIP: $e');
+      return null;
+    }
+  }
+
+  // Find JSON file in extracted directory
+  Future<File?> _findJsonFile(Directory directory) async {
+    try {
+      final files = directory
+          .listSync(recursive: true)
+          .where((entity) => entity is File && entity.path.endsWith('.json'))
+          .cast<File>()
+          .toList();
+
+      if (files.isNotEmpty) {
+        return files.first; // Return the first JSON file found
+      }
+      return null;
+    } catch (e) {
+      print('Error finding JSON file: $e');
+      return null;
+    }
+  }
+
+  // Delete original file from Android Documents directory
+  Future<Either<String, bool>> deleteOriginalAndroidFile() async {
+    try {
+      // Construct the path to the original file in Documents directory
+      final documentsDir = Directory('/storage/emulated/0/Documents');
+      final originalFilePath = path.join(documentsDir.path, _backupFileName);
+      final originalFile = File(originalFilePath);
+
+      // Check if the original file exists
+      if (await originalFile.exists()) {
+        await originalFile.delete();
+        print('Original Android file deleted successfully: $originalFilePath');
+        return Right(true);
+      } else {
+        print('Original Android file not found: $originalFilePath');
+        return Left('Original Android file not found');
+      }
+    } catch (e) {
+      print('Warning: Could not delete original Android file: $e');
+      return Left('Could not delete original Android file');
+      // Don't fail the operation if original file deletion fails
+    }
+  }
 }
-
-

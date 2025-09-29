@@ -8,6 +8,7 @@ import 'package:verby_flutter/presentation/theme/colors.dart';
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:image/image.dart' as imglib;
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import '../../data/models/remote/employee.dart';
 import '../../data/models/local/face_model.dart';
 import '../../data/service/face_recognition.dart';
@@ -53,6 +54,74 @@ class _FaceRegistrationScreenState
     super.initState();
     _initFaceDetector();
     _initializeControllerFuture = _initCamera();
+    _checkModelLoading();
+  }
+  
+  Future<void> _checkModelLoading() async {
+    // Wait for model to load with longer timeout for iOS release builds
+    final modelLoaded = await _faceRecognition.waitForModelLoading(timeoutSeconds: 30);
+    
+    if (!modelLoaded) {
+      if (mounted) {
+        setState(() {
+          _status = 'TensorFlow model failed to load. Tap to retry.';
+        });
+        
+        // Log model loading failure to Crashlytics
+        FirebaseCrashlytics.instance.recordError(
+          Exception('TensorFlow model failed to load in face registration'),
+          StackTrace.current,
+          reason: 'TFLite model loading timeout in face registration screen',
+          fatal: false,
+          information: [
+            'Employee ID: ${widget.employee.id}',
+            'Employee Name: ${widget.employee.name}',
+            'Timeout: 30 seconds',
+            'Model loaded: false',
+            'Platform: iOS Release',
+          ],
+        );
+      }
+    } else {
+      // TensorFlow model loaded successfully
+      if (mounted) {
+        setState(() {
+          _status = 'Camera ready. Center your face.';
+        });
+        
+        // Log successful model loading
+        FirebaseCrashlytics.instance.recordError(
+          Exception('TensorFlow model loaded successfully in face registration'),
+          StackTrace.current,
+          reason: 'TFLite model loading success in face registration screen',
+          fatal: false,
+          information: [
+            'Employee ID: ${widget.employee.id}',
+            'Employee Name: ${widget.employee.name}',
+            'Model loaded: true',
+            'Platform: iOS Release',
+          ],
+        );
+      }
+    }
+  }
+  
+  Future<void> _retryModelLoading() async {
+    setState(() {
+      _status = 'Retrying model loading...';
+    });
+    
+    final success = await _faceRecognition.retryModelLoading();
+    
+    if (success) {
+      setState(() {
+        _status = 'Model loaded successfully! Center your face.';
+      });
+    } else {
+      setState(() {
+        _status = 'Model loading failed. Please restart the app.';
+      });
+    }
   }
 
   void _initFaceDetector() {
@@ -65,16 +134,16 @@ class _FaceRegistrationScreenState
       minFaceSize: 0.05, // Even smaller minimum face size
     );
     _faceDetector = FaceDetector(options: options);
-    print('🔧 Face detector initialized with accurate mode and minFaceSize: 0.05 for registration');
+    // Face detector initialized with accurate mode and minFaceSize: 0.05 for registration
   }
 
   Future<void> _initCamera() async {
     try {
-      // Request camera permission first
-      final hasPermission = await CameraPermissionHelper.requestCameraPermission(context);
+      // Request camera and audio permissions first
+      final hasPermission = await CameraPermissionHelper.requestCameraAndAudioPermissions(context);
       if (!hasPermission) {
         setState(() {
-          _status = 'Camera permission denied. Please enable camera access in settings.';
+          _status = 'Camera or microphone permission denied. Please enable both permissions in settings.';
         });
         return;
       }
@@ -114,11 +183,25 @@ class _FaceRegistrationScreenState
         });
       }
     } catch (e) {
+      // Log camera initialization error to Crashlytics
+      FirebaseCrashlytics.instance.recordError(
+        e,
+        StackTrace.current,
+        reason: 'Camera initialization failed in face registration',
+        fatal: false,
+        information: [
+          'Employee ID: ${widget.employee.id}',
+          'Employee Name: ${widget.employee.name}',
+          'Platform: ${Platform.isIOS ? "iOS" : "Android"}',
+          'Permission granted: ${_controller?.value.isInitialized ?? false}',
+        ],
+      );
+      
       setState(() {
         _status = 'Failed to initialize camera: ${e.toString()}';
       });
       if (kDebugMode) {
-        print('Camera initialization error: $e');
+        // Camera initialization error logged to Crashlytics
       }
     }
   }
@@ -176,21 +259,16 @@ class _FaceRegistrationScreenState
       z: Range(zRangeStart, zRangeEnd),
     ));
     
-    print('📱 Device type: ${isTablet ? "Tablet" : isLargeScreen ? "Large Screen" : "Phone"}');
-    print('📏 Screen size: ${screenSize.width.toInt()}x${screenSize.height.toInt()} (diagonal: ${screenDiagonal.toInt()})');
-    print('🎯 Orientation ranges: X:±${xRange.toInt()}, Y:±${yRange.toInt()}, Z:${zRangeStart.toInt()} to ${zRangeEnd.toInt()}');
+    // Device type and orientation ranges configured
   }
 
   Future<void> _processImage(CameraImage image) async {
     if (_isProcessing || _faceDetector == null) return;
     _isProcessing = true;
 
-    print('🔄 Processing image frame...');
     try {
       final inputImage = _convertCameraImageToInputImage(image);
-      print('🔍 Processing input image: ${inputImage.metadata?.size}');
       final faces = await _faceDetector!.processImage(inputImage);
-      print('👤 Faces detected: ${faces.length}');
 
       if (faces.isEmpty) {
         _updateStatus('No face detected - please look at camera');
@@ -239,7 +317,6 @@ class _FaceRegistrationScreenState
         
         if (width < minPixelSize || height < minPixelSize || (cameraResolution != null && faceSizeRatio < minFaceSizeRatio)) {
           _updateStatus('Move closer to camera - face too small');
-          print('📏 Face size check: ${width.toInt()}x${height.toInt()} (min: ${minPixelSize}px), ratio: ${(faceSizeRatio * 100).toStringAsFixed(1)}% (min: ${(minFaceSizeRatio * 100).toInt()}%)');
         } else {
           final orientation = [
             face.headEulerAngleX ?? 0.0,
@@ -247,15 +324,31 @@ class _FaceRegistrationScreenState
             face.headEulerAngleZ ?? 0.0,
           ];
 
-          print(
-            '🎯 Face detected - Size: ${width.toInt()}x${height.toInt()}, Orientation: [${orientation[0].toStringAsFixed(1)}, ${orientation[1].toStringAsFixed(1)}, ${orientation[2].toStringAsFixed(1)}]',
-          );
-
           bool start = _checkIfFaceIsCentered(face);
           if (start) {
             _updateStatus('Face centered! Capturing...');
             final croppedFace = await _cropFace(image, face);
             if (croppedFace != null) {
+              // Check if TensorFlow model is loaded before processing
+              if (!_faceRecognition.isModelLoaded()) {
+                _updateStatus('TensorFlow model not loaded. Please restart the app.');
+                
+                // Log model not loaded error to Crashlytics
+                FirebaseCrashlytics.instance.recordError(
+                  Exception('TensorFlow model not loaded during face processing'),
+                  StackTrace.current,
+                  reason: 'TFLite model not available for face processing',
+                  fatal: false,
+                  information: [
+                    'Employee ID: ${widget.employee.id}',
+                    'Employee Name: ${widget.employee.name}',
+                    'Cropped face size: ${croppedFace.width}x${croppedFace.height}',
+                    'Model loaded: false',
+                  ],
+                );
+                return;
+              }
+              
               final success = _faceRecognition.addFace(
                 widget.employee.name!,
                 widget.employee.id!,
@@ -273,16 +366,64 @@ class _FaceRegistrationScreenState
                 await Future.delayed(Duration(seconds: 1));
                 Navigator.pop(context,true);
               } else {
+                // Log the face processing failure to Crashlytics
+                FirebaseCrashlytics.instance.recordError(
+                  Exception('Face processing failed - addFace returned false'),
+                  StackTrace.current,
+                  reason: 'Face recognition addFace method failed',
+                  fatal: false,
+                  information: [
+                    'Employee ID: ${widget.employee.id}',
+                    'Employee Name: ${widget.employee.name}',
+                    'Cropped face size: ${croppedFace.width}x${croppedFace.height}',
+                    'Face bounding box: ${face.boundingBox}',
+                    'Face orientation: X=${face.headEulerAngleX}, Y=${face.headEulerAngleY}, Z=${face.headEulerAngleZ}',
+                    'TFLite interpreter loaded: ${_faceRecognition.getRegisteredCount() > 0 ? "Unknown" : "Likely not loaded"}',
+                    'Registered faces count: ${_faceRecognition.getRegisteredCount()}',
+                  ],
+                );
+                
                 _updateStatus('Failed to process face - please try again');
               }
             } else {
+              // Log face cropping failure to Crashlytics
+              FirebaseCrashlytics.instance.recordError(
+                Exception('Face cropping failed - croppedFace is null'),
+                StackTrace.current,
+                reason: 'Face cropping process failed',
+                fatal: false,
+                information: [
+                  'Employee ID: ${widget.employee.id}',
+                  'Employee Name: ${widget.employee.name}',
+                  'Face bounding box: ${face.boundingBox}',
+                  'Camera image format: ${image.format}',
+                  'Camera image planes: ${image.planes.length}',
+                  'Face orientation: X=${face.headEulerAngleX}, Y=${face.headEulerAngleY}, Z=${face.headEulerAngleZ}',
+                ],
+              );
+              
               _updateStatus('Failed to crop face - please try again');
             }
           }
         }
       }
     } catch (e) {
-      print('❌ Error processing image: $e');
+      
+      // Log to Crashlytics with context
+      FirebaseCrashlytics.instance.recordError(
+        e,
+        StackTrace.current,
+        reason: 'Face registration image processing failed',
+        fatal: false,
+        information: [
+          'Employee ID: ${widget.employee.id}',
+          'Employee Name: ${widget.employee.name}',
+          'Camera initialized: ${_controller?.value.isInitialized ?? false}',
+          'Face detector initialized: ${_faceDetector != null}',
+          'Processing state: $_isProcessing',
+        ],
+      );
+      
       if (mounted) {
         setState(() {
           _status = 'Error processing image. Please try again.';
@@ -373,22 +514,12 @@ class _FaceRegistrationScreenState
       
       _isFaceOrientationCentered = isCentered;
       if (wasCentered != _isFaceOrientationCentered) {
-        if (isCentered) {
-        print('🟢 Face centered! Container should turn GREEN');
-        } else {
-          print('🔴 Face not centered! Container should turn RED');
-        }
         setState(() {});
       }
       
-      print('🎯 Face centering: Position(${isPositionCentered ? "✅" : "❌"}) Orientation(${isOrientationCentered ? "✅" : "❌"}) Overall(${isCentered ? "✅" : "❌"})');
-      print('📍 Face center: (${faceCenterX.toInt()}, ${faceCenterY.toInt()}) Frame center: (${frameCenterX.toInt()}, ${frameCenterY.toInt()})');
-      print('📏 Delta: (${deltaX.toInt()}, ${deltaY.toInt()}) Threshold: (${thresholdX.toInt()}, ${thresholdY.toInt()})');
-      
       return isCentered;
     } catch (e) {
-      print('❌ Error in face centering check: $e');
-    _isFaceOrientationCentered = false;
+      _isFaceOrientationCentered = false;
       return false;
     }
   }
@@ -409,7 +540,6 @@ class _FaceRegistrationScreenState
   void _updateStatus(String message) {
     if (_status != message) {
       setState(() => _status = message);
-      print('📱 Status updated: $message');
     }
   }
 
@@ -442,20 +572,16 @@ class _FaceRegistrationScreenState
         
         result.fold(
           (error) {
-            print('❌ Failed to save face to database: $error');
             _updateStatus('Database save failed: $error');
           },
           (_) {
-            print('✅ Face saved to database successfully');
             _updateStatus('Face saved to database!');
           },
         );
       } else {
-        print('❌ No registered faces found in face recognition service');
         _updateStatus('No face data to save');
       }
     } catch (e) {
-      print('❌ Error saving face to database: $e');
       _updateStatus('Error saving to database: $e');
     }
   }
@@ -486,8 +612,7 @@ class _FaceRegistrationScreenState
         format = InputImageFormat.nv21; // Android uses NV21 format
       }
       
-      print('📸 Camera image: ${image.width}x${image.height}, format: ${image.format}, planes: ${image.planes.length}');
-      print('🔄 Converted to: ${size.width.toInt()}x${size.height.toInt()}, rotation: $rotation, format: $format');
+      // Camera image converted to InputImage
       
     final metadata = InputImageMetadata(
       size: size,
@@ -497,7 +622,6 @@ class _FaceRegistrationScreenState
       );
       return InputImage.fromBytes(bytes: bytes, metadata: metadata);
     } catch (e) {
-      print('Error converting camera image: $e');
       // Fallback to basic conversion
       final allBytes = WriteBuffer();
       for (final plane in image.planes) {
@@ -511,7 +635,7 @@ class _FaceRegistrationScreenState
         format: InputImageFormat.nv21,
         bytesPerRow: image.planes.isNotEmpty ? (image.planes[0].bytesPerRow ?? image.width) : image.width,
       );
-      print('🔄 Fallback conversion with 90 degree rotation');
+      // Fallback conversion with 90 degree rotation
     return InputImage.fromBytes(bytes: bytes, metadata: metadata);
       }
   }
@@ -520,7 +644,6 @@ class _FaceRegistrationScreenState
     try {
     final fullImage = convertYUV420toImageColor(cameraImage);
       if (fullImage == null) {
-        print('❌ Failed to convert camera image to color image');
         return null;
       }
       
@@ -542,7 +665,23 @@ class _FaceRegistrationScreenState
     cropped = imglib.flipHorizontal(cropped); // flipX for front camera
     return imglib.copyResize(cropped, width: 112, height: 112);
     } catch (e) {
-      print('❌ Error cropping face: $e');
+      
+      // Log face cropping error to Crashlytics
+      FirebaseCrashlytics.instance.recordError(
+        e,
+        StackTrace.current,
+        reason: 'Face cropping method failed with exception',
+        fatal: false,
+        information: [
+          'Employee ID: ${widget.employee.id}',
+          'Employee Name: ${widget.employee.name}',
+          'Camera image format: ${cameraImage.format}',
+          'Camera image planes: ${cameraImage.planes.length}',
+          'Face bounding box: ${face.boundingBox}',
+          'Camera resolution: ${_controller?.value.previewSize}',
+        ],
+      );
+      
       return null;
     }
   }
@@ -557,7 +696,23 @@ class _FaceRegistrationScreenState
         return _convertAndroidYUV420toImageColor(image);
       }
     } catch (e) {
-      print('❌ Error converting image: $e');
+      
+      // Log image conversion error to Crashlytics
+      FirebaseCrashlytics.instance.recordError(
+        e,
+        StackTrace.current,
+        reason: 'Camera image format conversion failed',
+        fatal: false,
+        information: [
+          'Employee ID: ${widget.employee.id}',
+          'Employee Name: ${widget.employee.name}',
+          'Platform: ${Platform.isIOS ? "iOS" : "Android"}',
+          'Image format: ${image.format}',
+          'Image dimensions: ${image.width}x${image.height}',
+          'Image planes: ${image.planes.length}',
+        ],
+      );
+      
       return null;
     }
   }
@@ -683,13 +838,18 @@ class _FaceRegistrationScreenState
                   alignment: Alignment.bottomCenter,
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(0, 0, 0, 40.h),
-                    child: Text(
-                      _status,
-                      style: TextStyle(
-                        fontSize: 20.sp,
-                        fontWeight: FontWeight.bold,
+                    child: GestureDetector(
+                      onTap: _status.contains('Tap to retry') ? _retryModelLoading : null,
+                      child: Text(
+                        _status,
+                        style: TextStyle(
+                          fontSize: 20.sp,
+                          fontWeight: FontWeight.bold,
+                          color: _status.contains('Tap to retry') ? Colors.blue : Colors.black,
+                          decoration: _status.contains('Tap to retry') ? TextDecoration.underline : null,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
-                      textAlign: TextAlign.center,
                     ),
                   ),
                 ),

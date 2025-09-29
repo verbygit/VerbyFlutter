@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -36,7 +38,7 @@ class _SelectOperationScreenState extends ConsumerState<SelectOperationScreen> {
 
       ref
           .read(empPerformAndActionStateProvider.notifier)
-          .syncData(widget.employee);
+          .syncSingleEmpData(widget.employee);
     });
   }
 
@@ -93,9 +95,7 @@ class _SelectOperationScreenState extends ConsumerState<SelectOperationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(
-      empPerformAndActionStateProvider,
-    );
+    final state = ref.watch(empPerformAndActionStateProvider);
     ref.listen(empPerformAndActionStateProvider, (previous, next) {
       if (previous?.errorMessage != next.errorMessage &&
           next.errorMessage.isNotEmpty) {
@@ -103,147 +103,134 @@ class _SelectOperationScreenState extends ConsumerState<SelectOperationScreen> {
       }
     });
 
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: MColors().darkGrey,
-        automaticallyImplyLeading: false,
-        title: Center(
-          child: Text(
-            "chose_operation".tr(),
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 25.sp,
+    return GestureDetector(
+      onHorizontalDragUpdate: (details) {
+        // Detect left-to-right swipe (iOS back gesture)
+        if (Platform.isIOS) {
+          if (details.delta.dx > 5) {
+            // Adjust sensitivity as needed
+            Navigator.pop(context);
+          }
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: MColors().darkGrey,
+          automaticallyImplyLeading: false,
+          title: Center(
+            child: Text(
+              "chose_operation".tr(),
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 25.sp,
+              ),
             ),
           ),
         ),
-      ),
-      body: Stack(
-        children: [
-          Padding(
-            padding: EdgeInsets.all(5.r),
+        body: Stack(
+          children: [
+            Padding(
+              padding: EdgeInsets.all(5.r),
 
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _rowButton(
-                  firstButtonName: "stewarding".tr().toUpperCase(),
-                  secondButtonName: "unterhalt".tr().toUpperCase(),
-                  firstButtonOnPressed:
-                  state
-                      .currentEmpPerformState
-                      ?.isStewarding ??
-                      true
-                      ? () {
-                    navigateToActionScreen(Perform.STEWARDING);
-                  }
-                      : null,
-                  secondButtonOnPressed:
-                  state
-                      .currentEmpPerformState
-                      ?.isMaintenance ??
-                      true
-                      ? () {
-                    navigateToActionScreen(Perform.MAINTENANCE);
-                  }
-                      : null,
-                  firstButtonColor:
-                  state
-                      .currentEmpPerformState
-                      ?.isStewarding ??
-                      true
-                      ? Colors.black
-                      : MColors().darkGrey,
-                  secondButtonColor:
-                  state
-                      .currentEmpPerformState
-                      ?.isMaintenance ??
-                      true
-                      ? Colors.black
-                      : MColors().darkGrey,
-                ),
-                40.verticalSpace,
-                _rowButton(
-                  firstButtonName: "gouvernante".tr().toUpperCase(),
-                  secondButtonName: "raumpflegerin".tr().toUpperCase(),
-                  firstButtonOnPressed:
-                  state
-                      .currentEmpPerformState
-                      ?.isRoomControl ??
-                      true
-                      ? () {
-                    navigateToActionScreen(Perform.ROOMCONTROL);
-                  }
-                      : null,
-                  secondButtonOnPressed:
-                  state
-                      .currentEmpPerformState
-                      ?.isRoomCleaning ??
-                      true
-                      ? () {
-                    navigateToActionScreen(Perform.ROOMCLEANING);
-                  }
-                      : null,
-                  firstButtonColor:
-                  state
-                      .currentEmpPerformState
-                      ?.isRoomControl ??
-                      true
-                      ? Colors.black
-                      : MColors().darkGrey,
-                  secondButtonColor:
-                  state
-                      .currentEmpPerformState
-                      ?.isRoomCleaning ??
-                      true
-                      ? Colors.black
-                      : MColors().darkGrey,
-                ),
-                40.verticalSpace,
-
-                SizedBox(
-                  width: 170.w,
-                  child: ElevatedButton(
-                    onPressed:
-                    state.currentEmpPerformState?.isBuro ??
-                        true
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _rowButton(
+                    firstButtonName: "stewarding".tr().toUpperCase(),
+                    secondButtonName: "unterhalt".tr().toUpperCase(),
+                    firstButtonOnPressed:
+                        state.currentEmpPerformState?.isStewarding ?? true
                         ? () {
-                      navigateToActionScreen(Perform.BURO);
-                    }
+                            navigateToActionScreen(Perform.STEWARDING);
+                          }
                         : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor:
-                      state.currentEmpPerformState?.isBuro ??
-                          true
-                          ? Colors.black
-                          : MColors().darkGrey,
-                    ),
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 20.r),
-                      child: Text(
-                        "buro".tr(),
-                        style: TextStyle(color: Colors.white, fontSize: 15.sp),
+                    secondButtonOnPressed:
+                        state.currentEmpPerformState?.isMaintenance ?? true
+                        ? () {
+                            navigateToActionScreen(Perform.MAINTENANCE);
+                          }
+                        : null,
+                    firstButtonColor:
+                        state.currentEmpPerformState?.isStewarding ?? true
+                        ? Colors.black
+                        : MColors().darkGrey,
+                    secondButtonColor:
+                        state.currentEmpPerformState?.isMaintenance ?? true
+                        ? Colors.black
+                        : MColors().darkGrey,
+                  ),
+                  40.verticalSpace,
+                  _rowButton(
+                    firstButtonName: "gouvernante".tr().toUpperCase(),
+                    secondButtonName: "raumpflegerin".tr().toUpperCase(),
+                    firstButtonOnPressed:
+                        state.currentEmpPerformState?.isRoomControl ?? true
+                        ? () {
+                            navigateToActionScreen(Perform.ROOMCONTROL);
+                          }
+                        : null,
+                    secondButtonOnPressed:
+                        state.currentEmpPerformState?.isRoomCleaning ?? true
+                        ? () {
+                            navigateToActionScreen(Perform.ROOMCLEANING);
+                          }
+                        : null,
+                    firstButtonColor:
+                        state.currentEmpPerformState?.isRoomControl ?? true
+                        ? Colors.black
+                        : MColors().darkGrey,
+                    secondButtonColor:
+                        state.currentEmpPerformState?.isRoomCleaning ?? true
+                        ? Colors.black
+                        : MColors().darkGrey,
+                  ),
+                  40.verticalSpace,
+
+                  SizedBox(
+                    width: 170.w,
+                    child: ElevatedButton(
+                      onPressed: state.currentEmpPerformState?.isBuro ?? true
+                          ? () {
+                              navigateToActionScreen(Perform.BURO);
+                            }
+                          : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor:
+                            state.currentEmpPerformState?.isBuro ?? true
+                            ? Colors.black
+                            : MColors().darkGrey,
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 20.r),
+                        child: Text(
+                          "buro".tr(),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15.sp,
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          if (state.isLoading)
-            Container(
-              width: double.infinity,
-              height: double.infinity,
-              color: Colors.black38,
-              child: Center(
-                child: SpinKitCubeGrid(
-                  color: Colors.red,
-                  size: 100.0.r,
-                  duration: Duration(milliseconds: 800),
-                )
+                ],
               ),
             ),
-        ],
+            if (state.isLoading)
+              Container(
+                width: double.infinity,
+                height: double.infinity,
+                color: Colors.black38,
+                child: Center(
+                  child: SpinKitCubeGrid(
+                    color: Colors.red,
+                    size: 100.0.r,
+                    duration: Duration(milliseconds: 800),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

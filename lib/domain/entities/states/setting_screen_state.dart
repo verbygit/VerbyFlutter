@@ -8,6 +8,7 @@ class SettingScreenState {
   final bool isInternetConnected;
   final bool isFaceIdForAll;
   final bool isFaceForRegisterFace;
+  final double faceVerificationTries;
   final List<FaceModel>? faces;
   final SharedPreferencesHelper? sharedPreferencesHelper;
 
@@ -20,6 +21,7 @@ class SettingScreenState {
     this.isFaceForRegisterFace = false,
     this.faces,
     this.sharedPreferencesHelper,
+    this.faceVerificationTries=6,
   });
 
   SettingScreenState copyWith({
@@ -29,6 +31,7 @@ class SettingScreenState {
     bool? isLoading,
     String? errorMessage,
     String? message,
+    double? faceVerificationTries,
     SharedPreferencesHelper? sharedPreferencesHelper,
     List<FaceModel>? faces,
   }) {
@@ -43,6 +46,7 @@ class SettingScreenState {
       sharedPreferencesHelper:
           sharedPreferencesHelper ?? this.sharedPreferencesHelper,
       faces: faces ?? this.faces,
+      faceVerificationTries: faceVerificationTries ?? this.faceVerificationTries,
     );
   }
 }

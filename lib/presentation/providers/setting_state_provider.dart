@@ -1,29 +1,49 @@
+import 'dart:io';
+
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:verby_flutter/data/data_source/local/shared_preference_helper.dart';
+import 'package:verby_flutter/data/models/remote/record/CreateRecordRequest.dart';
+import 'package:verby_flutter/domain/use_cases/backup/delete_archive_use_case.dart';
 import 'package:verby_flutter/domain/use_cases/face/get_all_face_use_case.dart';
 import 'package:verby_flutter/presentation/providers/usecase/face/delete_face_use_case_provider.dart';
 import 'package:verby_flutter/presentation/providers/usecase/face/get_all_face_use_case_provider.dart';
 import 'package:verby_flutter/presentation/providers/usecase/face/is_face_exits_use_case_provider.dart';
+import 'package:verby_flutter/presentation/providers/usecase/record/create_multi_remote_record.dart';
 import 'package:verby_flutter/presentation/providers/usecase/sync/sync_data_use_case_provider.dart';
+import 'package:verby_flutter/presentation/providers/usecase/backup/upload_archive_use_case_provider.dart';
+import '../../data/models/remote/record/create_multi_record_request.dart';
 import '../../domain/core/connectivity_helper.dart';
 import '../../domain/entities/states/setting_screen_state.dart';
 import '../../domain/use_cases/face/delete_face_use_case.dart';
 import '../../domain/use_cases/face/is_face_exists_use_case.dart';
+import '../../domain/use_cases/record/create_multi_record_remotely__use_case.dart';
 import '../../domain/use_cases/sync/sync_data_use_case.dart';
+import '../../domain/use_cases/backup/upload_archive_use_case.dart';
 
 class SettingStateProvider extends StateNotifier<SettingScreenState> {
   final IsFaceExistsUseCase _isFaceExistsUseCase;
   final GetAllFaceUseCase _getAllFaceUseCase;
   final DeleteFaceUseCase _deleteFaceUseCase;
   final SyncDataUseCase _syncDataUseCase;
+  final UploadArchiveUseCase _uploadArchiveUseCase;
+  final CreateMultiRecordRemotelyUseCase _createMultiRecordRemotelyUseCase;
+  final DeleteArchiveUseCase _deleteArchiveUseCase;
 
   SettingStateProvider(
     this._isFaceExistsUseCase,
     this._getAllFaceUseCase,
     this._deleteFaceUseCase,
     this._syncDataUseCase,
-  ) : super(SettingScreenState(isInternetConnected:ConnectivityHelper().isConnected )) {
+    this._uploadArchiveUseCase,
+    this._createMultiRecordRemotelyUseCase,
+    this._deleteArchiveUseCase,
+  ) : super(
+        SettingScreenState(
+          isInternetConnected: ConnectivityHelper().isConnected,
+        ),
+      ) {
     setSharedPreferencesHelper();
     getAllFaces();
   }
@@ -78,7 +98,7 @@ class SettingStateProvider extends StateNotifier<SettingScreenState> {
         }
       }
       state = state.copyWith(isLoading: false);
-    }else{
+    } else {
       setErrorMessage("Internet is not available");
     }
   }
@@ -103,10 +123,12 @@ class SettingStateProvider extends StateNotifier<SettingScreenState> {
     final isFaceForAll = await sharedPreferencesHelper.isFaceIdForAll();
     final isFaceForRegisterFace = await sharedPreferencesHelper
         .isFaceIdForRegisterFace();
+    final faceVerificationTries = await sharedPreferencesHelper.getFaceTries();
     state = state.copyWith(
       sharedPreferencesHelper: sharedPreferencesHelper,
       isFaceIdForAll: isFaceForAll,
       isFaceForRegisterFace: isFaceForRegisterFace,
+      faceVerificationTries: faceVerificationTries,
     );
   }
 
@@ -132,12 +154,71 @@ class SettingStateProvider extends StateNotifier<SettingScreenState> {
     state = state.copyWith(isFaceForRegisterFace: value);
   }
 
+  Future<void> setFaceTries(double value) async {
+    final sharedPreferencesHelper = state.sharedPreferencesHelper;
+    if (sharedPreferencesHelper != null) {
+      await sharedPreferencesHelper.setFaceVerificationTries(value);
+    }
+
+    state = state.copyWith(faceVerificationTries: value);
+  }
+
   void setInternetConnected(bool value) {
     state = state.copyWith(isInternetConnected: value);
   }
 
   void setErrorMessage(String value) {
     state = state.copyWith(errorMessage: value);
+  }
+
+  void setMessage(String value) {
+    state = state.copyWith(message: value);
+  }
+
+  Future<void> uploadArchive() async {
+    state = state.copyWith(isLoading: true, errorMessage: '');
+
+    final result = await _uploadArchiveUseCase.call();
+
+    result.fold(
+      (failure) {
+        state = state.copyWith(isLoading: false, errorMessage: failure);
+      },
+      (records) async {
+        final result = await uploadRecordsFromArchive(records);
+        if (result) {
+          if (Platform.isAndroid) {
+            await _deleteArchiveUseCase.call();
+          }
+          state = state.copyWith(
+            isLoading: false,
+            message: 'record_sent_success'.tr(),
+          );
+        } else {
+          state = state.copyWith(
+            isLoading: false,
+            errorMessage: 'failed_to_process'.tr(),
+          );
+        }
+      },
+    );
+  }
+
+  Future<bool> uploadRecordsFromArchive(
+    List<CreateRecordRequest> records,
+  ) async {
+    final createMultiRecordRequest = CreateMultiRecordRequest(records: records);
+    final result = await _createMultiRecordRemotelyUseCase.call(
+      createMultiRecordRequest,
+    );
+    return await result.fold(
+      (onError) async {
+        return false;
+      },
+      (onData) async {
+        return true;
+      },
+    );
   }
 }
 
@@ -148,12 +229,19 @@ final settingScreenStateProvider =
         final getAllFacesUseCase = ref.read(getAllFacesUseCaseProvider);
         final deleteFaceUseCase = ref.read(deleteFaceUseCaseProvider);
         final syncDataUseCase = ref.read(syncDataUseCaseProvider);
-
+        final uploadArchiveUseCase = ref.read(uploadArchiveUseCaseProvider);
+        final createMultiRecordsUseCase = ref.read(
+          createMultiRecordRemoteUseCaseProvider,
+        );
+        final deleteArchiveUseCase = ref.read(deleteArchiveUseCaseProvider);
         return SettingStateProvider(
           isFaceExits,
           getAllFacesUseCase,
           deleteFaceUseCase,
           syncDataUseCase,
+          uploadArchiveUseCase,
+          createMultiRecordsUseCase,
+          deleteArchiveUseCase,
         );
       },
     );

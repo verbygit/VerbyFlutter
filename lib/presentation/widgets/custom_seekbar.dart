@@ -38,30 +38,53 @@ class ConcentricThumb extends SliderComponentShape {
     c.drawCircle(center, inner, Paint()..color = innerColor);
   }
 }
-
 class FancySeekBar extends StatefulWidget {
-  double value;
+  final double value;
   final double min;
   final double max;
-   FancySeekBar({super.key,  required this.min, required this.value, required this.max});
+  final ValueChanged<double>? onChanged; // Callback to notify parent
+
+  FancySeekBar({
+    super.key,
+    required this.min,
+    required this.value,
+    required this.max,
+    this.onChanged,
+  });
+
   @override
   State<FancySeekBar> createState() => _FancySeekBarState();
 }
 
 class _FancySeekBarState extends State<FancySeekBar> {
+  late double _currentValue; // Local state to track the slider value
 
+  @override
+  void initState() {
+    super.initState();
+    _currentValue = widget.value; // Initialize with widget.value
+  }
+
+  @override
+  void didUpdateWidget(FancySeekBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Update _currentValue if widget.value changes externally
+    if (oldWidget.value != widget.value) {
+      _currentValue = widget.value;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     // Scaled sizes
-    final double innerR  = 12.r;
-    final double ring1R  = 16.r;
-    final double ring2R  = 20.r;          // thumb outer radius
-    final double trackH  = 6.r;           // track height
-    final double labelH  = 28.h;          // space for value label
+    final double innerR = 12.r;
+    final double ring1R = 16.r;
+    final double ring2R = 20.r; // thumb outer radius
+    final double trackH = 6.r; // track height
+    final double labelH = 28.h; // space for value label
     final double sliderH = (ring2R * 2) + 8.h; // space for slider itself
-    final double capDia  = 24.r;
-    final double capR    = capDia / 2;
+    final double capDia = 24.r;
+    final double capR = capDia / 2;
 
     final double totalH = labelH + sliderH; // <-- explicit height for the Stack
 
@@ -70,18 +93,18 @@ class _FancySeekBarState extends State<FancySeekBar> {
       child: LayoutBuilder(
         builder: (context, constraints) {
           // Track geometry
-          final double trackLeft  = ring2R;
+          final double trackLeft = ring2R;
           final double trackRight = constraints.maxWidth - ring2R;
           final double trackWidth = trackRight - trackLeft;
 
           // Thumb X
-          final double t = (widget.value - widget.min) / (widget.max - widget.min);
+          final double t = (_currentValue - widget.min) / (widget.max - widget.min);
           final double thumbX = trackLeft + t * trackWidth;
 
           // Track center Y
           final double trackCenterY = labelH + (sliderH / 2);
 
-          return SizedBox(                     // <-- ensures the Stack has height
+          return SizedBox(
             height: totalH,
             width: constraints.maxWidth,
             child: Stack(
@@ -94,23 +117,22 @@ class _FancySeekBarState extends State<FancySeekBar> {
                   height: labelH,
                   child: Center(
                     child: Text(
-                      widget.value.toStringAsFixed(0),
+                      _currentValue.toStringAsFixed(0),
                       style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w600),
                     ),
                   ),
                 ),
 
                 // Slider
-
                 // Start cap (centered on track)
                 Positioned(
-                  left: trackLeft - capR+4,
+                  left: trackLeft - capR + 4,
                   top: trackCenterY - capR,
                   child: _endCap(capDia),
                 ),
                 // End cap
                 Positioned(
-                  left: trackRight - capR-4,
+                  left: trackRight - capR - 4,
                   top: trackCenterY - capR,
                   child: _endCap(capDia),
                 ),
@@ -127,19 +149,25 @@ class _FancySeekBarState extends State<FancySeekBar> {
                       activeTrackColor: Colors.grey.shade300,
                       inactiveTrackColor: Colors.grey.shade300,
                       thumbShape: ConcentricThumb(
-                        inner: innerR, ring1: ring1R, ring2: ring2R,
+                        inner: innerR,
+                        ring1: ring1R,
+                        ring2: ring2R,
                       ),
                     ),
                     child: Slider(
-                      value: widget.value,
+                      value: _currentValue,
                       min: widget.min,
                       max: widget.max,
                       divisions: (widget.max - widget.min).toInt(),
-                      onChanged: (v) => setState(() => widget.value = v.roundToDouble()),
+                      onChanged: (v) {
+                        setState(() {
+                          _currentValue = v.roundToDouble();
+                        });
+                        widget.onChanged?.call(_currentValue); // Notify parent
+                      },
                     ),
                   ),
                 ),
-
               ],
             ),
           );

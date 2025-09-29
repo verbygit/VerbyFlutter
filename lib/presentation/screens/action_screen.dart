@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart' hide Action;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +12,7 @@ import 'package:verby_flutter/domain/entities/perform.dart';
 import 'package:verby_flutter/domain/entities/action.dart';
 import 'package:verby_flutter/presentation/screens/depa_and_room/rooms_and_depa_screen.dart';
 import 'package:verby_flutter/utils/helper_functions.dart';
+import 'package:verby_flutter/data/service/sound_service.dart';
 import '../../data/models/local/depa_restant_model.dart';
 import '../providers/emp_perform_action_state_provider.dart';
 import '../theme/colors.dart';
@@ -32,6 +35,15 @@ class ActionScreen extends ConsumerStatefulWidget {
 }
 
 class _ActionScreen extends ConsumerState<ActionScreen> {
+
+  @override
+  void initState() {
+    super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback((ctx){
+
+    });
+  }
   Widget _rowButtonWithIcon({
     String firstButtonName = "",
     String secondButtonName = "",
@@ -129,6 +141,8 @@ class _ActionScreen extends ConsumerState<ActionScreen> {
         .read(empPerformAndActionStateProvider.notifier)
         .createRecord(widget.employee, widget.perform, action, depa, restant);
     if (result) {
+      // Play thank you sound based on current language
+       SoundService.playThankYouSound(context);
       Navigator.popUntil(context, (Route<dynamic> route) => route.isFirst);
     }
   }
@@ -150,113 +164,124 @@ class _ActionScreen extends ConsumerState<ActionScreen> {
             .setSuccessMessage("");
       }
     });
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: MColors().darkGrey,
-        automaticallyImplyLeading: false,
-        title: Center(
-          child: Text(
-            "chose_operation".tr(),
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 25.sp,
+    return GestureDetector(
+      onHorizontalDragUpdate: (details) {
+        // Detect left-to-right swipe (iOS back gesture)
+        if (Platform.isIOS) {
+          if (details.delta.dx > 5) {
+                    // Adjust sensitivity as needed
+                    Navigator.pop(context);
+                  }
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: MColors().darkGrey,
+          automaticallyImplyLeading: false,
+          title: Center(
+            child: Text(
+              "chose_operation".tr(),
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 25.sp,
+              ),
             ),
           ),
         ),
-      ),
-      body: Stack(
-        children: [
-          Padding(
-            padding: EdgeInsets.all(5.r),
+        body: Stack(
+          children: [
+            Padding(
+              padding: EdgeInsets.all(5.r),
 
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _rowButtonWithIcon(
-                  firstButtonName: "checkin".tr().toUpperCase(),
-                  secondButtonName: "check-out".tr().toUpperCase(),
-                  firstButtonIcon: Icons.play_arrow_outlined,
-                  secondButtonIcon: Icons.stop_outlined,
-                  firstButtonOnPressed:
-                      state.currentEmpActionState?.checkedIn ?? true
-                      ? () {
-                          _createRecord(Action.CHECKIN);
-                        }
-                      : null,
-                  secondButtonOnPressed:
-                      state.currentEmpActionState?.checkedOut ?? true
-                      ? () {
-                          _createRecord(Action.CHECKOUT);
-                        }
-                      : null,
-                  firstButtonColor:
-                      state.currentEmpActionState?.checkedIn ?? true
-                      ? Colors.black
-                      : MColors().darkGrey,
-                  secondButtonColor:
-                      state.currentEmpActionState?.checkedOut ?? true
-                      ? Colors.black
-                      : MColors().darkGrey,
-                  firstIconColor: state.currentEmpActionState?.checkedIn ?? true
-                      ? MColors().freshGreen
-                      : MColors().veryLightGray2,
-                  secondIconColor:
-                      state.currentEmpActionState?.checkedOut ?? true
-                      ? MColors().crimsonRed
-                      : MColors().veryLightGray2,
-                ),
-                40.verticalSpace,
-                _rowButtonWithIcon(
-                  firstButtonName: "pause-in".tr().toUpperCase(),
-                  secondButtonName: "pause-out".tr().toUpperCase(),
-                  firstButtonIcon: Icons.pause,
-                  secondButtonIcon: Icons.refresh,
-                  firstButtonOnPressed:
-                      state.currentEmpActionState?.pausedIn ?? true
-                      ? () {
-                          _createRecord(Action.PAUSEIN);
-                        }
-                      : null,
-                  secondButtonOnPressed:
-                      state.currentEmpActionState?.pausedOut ?? true
-                      ? () {
-                          _createRecord(Action.PAUSEOUT);
-                        }
-                      : null,
-                  firstButtonColor:
-                      state.currentEmpActionState?.pausedIn ?? true
-                      ? Colors.black
-                      : MColors().darkGrey,
-                  secondButtonColor:
-                      state.currentEmpActionState?.pausedOut ?? true
-                      ? Colors.black
-                      : MColors().darkGrey,
-                  firstIconColor: state.currentEmpActionState?.pausedIn ?? true
-                      ? MColors().amber
-                      : MColors().veryLightGray2,
-                  secondIconColor:
-                      state.currentEmpActionState?.pausedOut ?? true
-                      ? MColors().skyBlue
-                      : MColors().veryLightGray2,
-                ),
-              ],
-            ),
-          ),
-          if (state.isLoading)
-            Container(
-              width: double.infinity,
-              height: double.infinity,
-              color: Colors.black38,
-              child: Center(
-                child: SpinKitCubeGrid(
-                  color: Colors.red,
-                  size: 100.0.r,
-                  duration: Duration(milliseconds: 800),
-                ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _rowButtonWithIcon(
+                    firstButtonName: "checkin".tr().toUpperCase(),
+                    secondButtonName: "check-out".tr().toUpperCase(),
+                    firstButtonIcon: Icons.play_arrow_outlined,
+                    secondButtonIcon: Icons.stop_outlined,
+                    firstButtonOnPressed:
+                        state.currentEmpActionState?.checkedIn ?? true
+                        ? () {
+                            _createRecord(Action.CHECKIN);
+                          }
+                        : null,
+                    secondButtonOnPressed:
+                        state.currentEmpActionState?.checkedOut ?? true
+                        ? () {
+                            _createRecord(Action.CHECKOUT);
+                          }
+                        : null,
+                    firstButtonColor:
+                        state.currentEmpActionState?.checkedIn ?? true
+                        ? Colors.black
+                        : MColors().darkGrey,
+                    secondButtonColor:
+                        state.currentEmpActionState?.checkedOut ?? true
+                        ? Colors.black
+                        : MColors().darkGrey,
+                    firstIconColor: state.currentEmpActionState?.checkedIn ?? true
+                        ? MColors().freshGreen
+                        : MColors().veryLightGray2,
+                    secondIconColor:
+                        state.currentEmpActionState?.checkedOut ?? true
+                        ? MColors().crimsonRed
+                        : MColors().veryLightGray2,
+                  ),
+                  40.verticalSpace,
+                  _rowButtonWithIcon(
+                    firstButtonName: "pause-in".tr().toUpperCase(),
+                    secondButtonName: "pause-out".tr().toUpperCase(),
+                    firstButtonIcon: Icons.pause,
+                    secondButtonIcon: Icons.refresh,
+                    firstButtonOnPressed:
+                        state.currentEmpActionState?.pausedIn ?? true
+                        ? () {
+                            _createRecord(Action.PAUSEIN);
+                          }
+                        : null,
+                    secondButtonOnPressed:
+                        state.currentEmpActionState?.pausedOut ?? true
+                        ? () {
+                            _createRecord(Action.PAUSEOUT);
+                          }
+                        : null,
+                    firstButtonColor:
+                        state.currentEmpActionState?.pausedIn ?? true
+                        ? Colors.black
+                        : MColors().darkGrey,
+                    secondButtonColor:
+                        state.currentEmpActionState?.pausedOut ?? true
+                        ? Colors.black
+                        : MColors().darkGrey,
+                    firstIconColor: state.currentEmpActionState?.pausedIn ?? true
+                        ? MColors().amber
+                        : MColors().veryLightGray2,
+                    secondIconColor:
+                        state.currentEmpActionState?.pausedOut ?? true
+                        ? MColors().skyBlue
+                        : MColors().veryLightGray2,
+                  ),
+                ],
               ),
             ),
-        ],
+            if (state.isLoading)
+              Container(
+                width: double.infinity,
+                height: double.infinity,
+                color: Colors.black38,
+                child: Center(
+                  child: SpinKitCubeGrid(
+                    color: Colors.red,
+                    size: 100.0.r,
+                    duration: Duration(milliseconds: 800),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

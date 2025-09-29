@@ -98,12 +98,42 @@ class EmpPerformAndActionStateNotifier
     state = state.copyWith(message: message);
   }
 
+  Future<void> syncSingleEmpData(Employee employee) async {
+    state = state.copyWith(isLoading: true);
+    UserModel? userModel = SharedPreferencesHelper(
+      await SharedPreferences.getInstance(),
+    ).getUser();
+
+    state = state.copyWith(user: userModel);
+
+    if (state.isInternetConnected) {
+      if (userModel != null) {
+        final result = await _syncDataUseCase.syncSingleEmpData(
+          userModel,
+          employee.id ?? -1,
+        );
+
+        if (result.isNotEmpty) {
+          state = state.copyWith(isLoading: false, errorMessage: result);
+          return;
+        }
+      }
+    }
+
+    if (employee.id != null) {
+      await setCurrentPerformAndActionState(employee.id!);
+    }
+    state = state.copyWith(isLoading: false,);
+  }
+
   Future<void> syncData(Employee employee) async {
     state = state.copyWith(isLoading: true);
     if (state.isInternetConnected) {
       UserModel? userModel = SharedPreferencesHelper(
         await SharedPreferences.getInstance(),
       ).getUser();
+
+      state = state.copyWith(user: userModel);
       if (userModel != null) {
         final result = await _syncDataUseCase.syncData(userModel, false);
         if (result.isNotEmpty) {
@@ -131,9 +161,7 @@ class EmpPerformAndActionStateNotifier
     List<DepaRestantModel?>? restant,
   ) async {
     state = state.copyWith(isLoading: true);
-    final user = SharedPreferencesHelper(
-      await SharedPreferences.getInstance(),
-    ).getUser();
+    final user = state.user;
 
     final time = DateTimeHelper.getRecordFormatDate();
 

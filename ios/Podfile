@@ -58,6 +58,9 @@ post_install do |installer|
         # If you ONLY ADD to library (no read), uncomment:
         # 'PERMISSION_PHOTOS_ADD_ONLY=1',
       ]
+      
+      # iOS deployment target for compatibility
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.5'
     end
   end
 end

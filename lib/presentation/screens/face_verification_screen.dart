@@ -11,6 +11,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:image/image.dart' as imglib;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:verby_flutter/data/data_source/local/shared_preference_helper.dart';
 import 'package:verby_flutter/data/models/remote/employee.dart';
 import 'package:verby_flutter/data/models/local/face_model.dart';
 import 'package:verby_flutter/presentation/providers/reposiory/face_repo_provider.dart';
@@ -64,7 +66,7 @@ class _FaceVerificationScreenState
   EyeState _currentEyeState = EyeState.none;
   String _status = 'Loading registered face...';
   int _retryCount = 0;
-  final int _maxRetries = 3; // Reduced for testing
+  int _maxRetries = 6; // Reduced for testing
   bool _isFaceOrientationCentered = false;
   bool isNavigatedForward = false;
   List<({Range x, Range y, Range z})> _faceOrientationPoints = [];
@@ -76,6 +78,15 @@ class _FaceVerificationScreenState
     _initFaceDetector();
     _initializeControllerFuture = _initCamera();
     _loadRegisteredFaces();
+    _setMaxTries();
+  }
+
+  void _setMaxTries() async {
+    final tries =await SharedPreferencesHelper(
+      await SharedPreferences.getInstance(),
+    ).getFaceTries();
+    _maxRetries = tries?.toInt()??6;
+    print("_maxRetries==================> $tries");
   }
 
   Future<void> _loadRegisteredFaces() async {
@@ -210,13 +221,15 @@ class _FaceVerificationScreenState
 
   Future<void> _initCamera() async {
     try {
-      // Request camera permission first
+      // Request camera and audio permissions first
       final hasPermission =
-          await CameraPermissionHelper.requestCameraPermission(context);
+          await CameraPermissionHelper.requestCameraAndAudioPermissions(
+            context,
+          );
       if (!hasPermission) {
         setState(() {
           _status =
-              'Camera permission denied. Please enable camera access in settings.';
+              'Camera or microphone permission denied. Please enable both permissions in settings.';
         });
         return;
       }
@@ -371,11 +384,17 @@ class _FaceVerificationScreenState
               } else {
                 // Face not recognized - increment retry count
                 _retryCount++;
-                print('🔄 Face not recognized. Retry count: $_retryCount/$_maxRetries');
-                
+                print(
+                  '🔄 Face not recognized. Retry count: $_retryCount/$_maxRetries',
+                );
+
                 if (_retryCount >= _maxRetries) {
-                  print('🚨 MAXIMUM RETRIES REACHED (face not recognized)! Setting isRetryFinished = true');
-                  _updateStatus('Maximum retries reached - verification failed');
+                  print(
+                    '🚨 MAXIMUM RETRIES REACHED (face not recognized)! Setting isRetryFinished = true',
+                  );
+                  _updateStatus(
+                    'Maximum retries reached - verification failed',
+                  );
                   setState(() {
                     isRetryFinished = true;
                   });
@@ -394,10 +413,14 @@ class _FaceVerificationScreenState
             } else {
               // Face cropping failed - increment retry count
               _retryCount++;
-              print('🔄 Face cropping failed. Retry count: $_retryCount/$_maxRetries');
-              
+              print(
+                '🔄 Face cropping failed. Retry count: $_retryCount/$_maxRetries',
+              );
+
               if (_retryCount >= _maxRetries) {
-                print('🚨 MAXIMUM RETRIES REACHED (face cropping failed)! Setting isRetryFinished = true');
+                print(
+                  '🚨 MAXIMUM RETRIES REACHED (face cropping failed)! Setting isRetryFinished = true',
+                );
                 _updateStatus('Maximum retries reached - verification failed');
                 setState(() {
                   isRetryFinished = true;
@@ -568,10 +591,14 @@ class _FaceVerificationScreenState
     } else {
       // Face verification failed - either wrong person or insufficient similarity
       _retryCount++;
-      print('🔄 Face verification failed. Retry count: $_retryCount/$_maxRetries');
-      
+      print(
+        '🔄 Face verification failed. Retry count: $_retryCount/$_maxRetries',
+      );
+
       if (_retryCount >= _maxRetries) {
-        print('🚨 MAXIMUM RETRIES REACHED (face verification failed)! Setting isRetryFinished = true');
+        print(
+          '🚨 MAXIMUM RETRIES REACHED (face verification failed)! Setting isRetryFinished = true',
+        );
         _updateStatus('Maximum retries reached - verification failed');
         setState(() {
           isRetryFinished = true;
@@ -641,7 +668,7 @@ class _FaceVerificationScreenState
 
     // Restart camera processing
     _restartCameraProcessing();
-    
+
     // Reload registered faces and restart the process
     _loadRegisteredFaces();
     print('🔄 Verification process restarted');
@@ -1058,18 +1085,18 @@ class _FaceVerificationScreenState
                                 ),
                               )
                             : _controller != null &&
-                                    _controller!.value.isInitialized
-                                ? CameraPreview(_controller!)
-                                : Container(
-                                    color: Colors.black,
-                                    child: Center(
-                                      child: Text(
-                                        _status,
-                                        style: TextStyle(color: Colors.white),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ),
+                                  _controller!.value.isInitialized
+                            ? CameraPreview(_controller!)
+                            : Container(
+                                color: Colors.black,
+                                child: Center(
+                                  child: Text(
+                                    _status,
+                                    style: TextStyle(color: Colors.white),
+                                    textAlign: TextAlign.center,
                                   ),
+                                ),
+                              ),
                       ),
                     ),
                   ),
