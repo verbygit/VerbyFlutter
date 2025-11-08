@@ -7,6 +7,7 @@ import 'package:verby_flutter/core/date_time_extension.dart';
 import 'package:verby_flutter/data/data_source/local/shared_preference_helper.dart';
 import 'package:verby_flutter/data/models/local/employee_action_state.dart';
 import 'package:verby_flutter/data/models/local/employee_performs_state.dart';
+import 'package:verby_flutter/data/models/remote/device_response.dart';
 import 'package:verby_flutter/data/models/remote/employee.dart';
 import 'package:verby_flutter/data/models/remote/last_record.dart';
 import 'package:verby_flutter/data/models/remote/login_response_model.dart';
@@ -14,6 +15,7 @@ import 'package:verby_flutter/data/models/remote/record_response.dart';
 import 'package:verby_flutter/domain/entities/action.dart';
 import 'package:verby_flutter/domain/entities/perform.dart';
 import 'package:verby_flutter/domain/entities/states/login_state.dart';
+import 'package:verby_flutter/domain/use_cases/auth/get_device_info_use_case.dart';
 import 'package:verby_flutter/domain/use_cases/plan/get_plan_use_case.dart';
 import 'package:verby_flutter/domain/use_cases/auth/login_use_case.dart';
 import 'package:verby_flutter/domain/use_cases/employee/get_employee_use_case.dart';
@@ -27,6 +29,7 @@ import 'package:verby_flutter/presentation/providers/usecase/employee/get_local_
 import 'package:verby_flutter/presentation/providers/usecase/employee/insert_emp_action_state_usecase.dart';
 import 'package:verby_flutter/presentation/providers/usecase/employee/insert_employee_perform_state_usecase.dart';
 import 'package:verby_flutter/presentation/providers/usecase/employee/save_employee_locally_usecase.dart';
+import 'package:verby_flutter/presentation/providers/usecase/get_device_info_use_case_provider.dart';
 import 'package:verby_flutter/presentation/providers/usecase/plan/get_plan_use_case_provider.dart';
 import 'package:verby_flutter/presentation/providers/usecase/record/get_record_use_case_provider.dart';
 import 'package:verby_flutter/presentation/providers/usecase/login_use_case_provider.dart';
@@ -48,6 +51,7 @@ class LoginNotifier extends StateNotifier<LoginState> {
   final InsertEmpActionStates insertEmpActionState;
   final GetPlanUseCase getPlanUseCase;
   final InsertPlansUseCase insertPlansUseCase;
+  final GetDeviceInfoUseCase _getDeviceInfoUseCase;
 
   LoginNotifier(
     this.loginUseCase,
@@ -61,6 +65,7 @@ class LoginNotifier extends StateNotifier<LoginState> {
     this.insertEmpActionState,
     this.getPlanUseCase,
     this.insertPlansUseCase,
+    this._getDeviceInfoUseCase,
   ) : super(LoginState()) {
     _getUser();
     _getEmployees();
@@ -112,11 +117,19 @@ class LoginNotifier extends StateNotifier<LoginState> {
       },
       (loginResponse) async {
         await saveAuthToken(loginResponse.token ?? "");
-        final employeeResult = await getEmployeesAndSave(
-          loginResponse.deviceId ?? -1,
-        );
-        if (employeeResult) {
-          await saveLoginResponse(loginResponse, password);
+
+        // Run getEmployeesAndSave and getDeviceInfo in parallel using Future.wait
+        final results = await Future.wait([
+          getEmployeesAndSave(loginResponse.deviceId ?? -1),
+          getDeviceInfo(loginResponse.deviceId.toString()),
+        ]);
+
+        // Extract results from Future.wait
+        final employeeResult = results[0] as bool;
+        final deviceData = results[1] as DeviceResponse?;
+
+        if (employeeResult && deviceData != null) {
+          await saveLoginResponse(loginResponse, password, deviceData);
 
           state = state.copyWith(
             isSignedIn: true,
@@ -129,6 +142,18 @@ class LoginNotifier extends StateNotifier<LoginState> {
             error: "Something went wrong",
           );
         }
+      },
+    );
+  }
+
+  Future<DeviceResponse?> getDeviceInfo(String deviceID) async {
+    final deviceResult = await _getDeviceInfoUseCase.call(deviceID);
+    return deviceResult.fold(
+      (onError) async {
+        return null;
+      },
+      (onData) async {
+        return onData;
       },
     );
   }
@@ -198,8 +223,13 @@ class LoginNotifier extends StateNotifier<LoginState> {
   Future<void> saveLoginResponse(
     LoginResponseModel loginResponseModel,
     String password,
+    DeviceResponse deviceResponse,
   ) async {
-    sharedPreferencesHelper?.saveUser(loginResponseModel, password);
+    sharedPreferencesHelper?.saveUser(
+      loginResponseModel,
+      deviceResponse,
+      password,
+    );
   }
 
   Future<void> clearError() async {
@@ -209,6 +239,7 @@ class LoginNotifier extends StateNotifier<LoginState> {
   void setMessage(String message) {
     state = state.copyWith(message: message);
   }
+
   void setErrorMessage(String message) {
     state = state.copyWith(error: message);
   }
@@ -409,19 +440,19 @@ class LoginNotifier extends StateNotifier<LoginState> {
 }
 
 final loginProvider = StateNotifierProvider<LoginNotifier, LoginState>((ref) {
-  final loginUseCase = ref.watch(loginUseCaseProvider);
-  final checkPasswordUseCase = ref.watch(checkPasswordUseCaseProvider);
-  final getEmployeeUseCase = ref.watch(getEmployeeUseCaseProvider);
-  final saveEmployeesLocallyUseCase = ref.watch(saveEmployeesLocallyProvider);
-  final getLocalEmployeesUsecase = ref.watch(getLocalEmployeeUseCaseProvider);
-  final getRecordUseCase = ref.watch(getRecordUseCaseProvider);
-  final insertEmpPerformState = ref.watch(
+  final loginUseCase = ref.read(loginUseCaseProvider);
+  final checkPasswordUseCase = ref.read(checkPasswordUseCaseProvider);
+  final getEmployeeUseCase = ref.read(getEmployeeUseCaseProvider);
+  final saveEmployeesLocallyUseCase = ref.read(saveEmployeesLocallyProvider);
+  final getLocalEmployeesUsecase = ref.read(getLocalEmployeeUseCaseProvider);
+  final getRecordUseCase = ref.read(getRecordUseCaseProvider);
+  final insertEmpPerformState = ref.read(
     insertEmployeePerformStatesUseCaseProvider,
   );
-  final insertEmpActionState = ref.watch(insertEmpActionStatesUserCaseProvider);
-  final getPlanUseCase = ref.watch(getPlanUseCaseProvider);
-  final insertPlanUseCase = ref.watch(insertPlansUseCaseProvider);
-
+  final insertEmpActionState = ref.read(insertEmpActionStatesUserCaseProvider);
+  final getPlanUseCase = ref.read(getPlanUseCaseProvider);
+  final insertPlanUseCase = ref.read(insertPlansUseCaseProvider);
+  final getDeviceInfoUseCase = ref.read(getDeviceInfoUseCaseProvider);
   // Handle SharedPreferences asynchronously to avoid exceptions
   final sharedPrefsAsync = ref.watch(sharedPreferencesProvider);
   final sharedPreferencesHelper = sharedPrefsAsync.when(
@@ -442,5 +473,6 @@ final loginProvider = StateNotifierProvider<LoginNotifier, LoginState>((ref) {
     insertEmpActionState,
     getPlanUseCase,
     insertPlanUseCase,
+    getDeviceInfoUseCase,
   );
 });

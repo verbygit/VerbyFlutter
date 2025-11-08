@@ -1,5 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/src/widgets/framework.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -35,108 +36,6 @@ class _SettingScreen extends ConsumerState<SettingScreen> {
     super.initState();
   }
 
-  void _showDeleteAllFacesDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(
-            "Delete All Faces",
-            style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-          ),
-          content: Text(
-            "Are you sure you want to delete ALL registered faces? This action cannot be undone.\n\nThis is a debug feature for development only.",
-            style: TextStyle(fontSize: 14.sp),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text("Cancel", style: TextStyle(color: Colors.grey)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              onPressed: () async {
-                Navigator.of(context).pop();
-                await _deleteAllFaces();
-              },
-              child: Text("Delete All", style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _deleteAllFaces() async {
-    try {
-      final faceRepo = ref.read(faceRepoProvider);
-
-      // Show loading dialog
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          content: Row(
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 20.w),
-              Text("Deleting all faces..."),
-            ],
-          ),
-        ),
-      );
-
-      // Use the efficient bulk delete method
-      final deleteResult = await faceRepo.deleteAllFaces();
-
-      Navigator.of(context).pop(); // Close loading dialog
-
-      deleteResult.fold(
-        (error) {
-          _showErrorDialog("Failed to delete all faces: $error");
-        },
-        (_) {
-          _showSuccessDialog();
-        },
-      );
-    } catch (e) {
-      Navigator.of(context).pop(); // Close loading dialog if open
-      _showErrorDialog("Unexpected error: $e");
-    }
-  }
-
-  void _showSuccessDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text("Success", style: TextStyle(color: Colors.green)),
-        content: Text("All faces have been deleted successfully!"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text("OK"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showErrorDialog(String error) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text("Error"),
-        content: Text(error),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text("OK"),
-          ),
-        ],
-      ),
-    );
-  }
-
   void showIdentificationDialog(bool isEditFace) async {
     final buildContext = context;
     final employee = await showDialog<Employee>(
@@ -152,7 +51,7 @@ class _SettingScreen extends ConsumerState<SettingScreen> {
       print("is Face exist====> $isFaceExists");
 
       if (isFaceExists && !isEditFace) {
-        showErrorSnackBar("Face ID already Registered", context);
+        showErrorSnackBar("face_id_already_registered".tr(), context);
         return;
       } else if (!isFaceExists && isEditFace) {
         showErrorSnackBar("missing_Face".tr(), context);
@@ -178,6 +77,9 @@ class _SettingScreen extends ConsumerState<SettingScreen> {
   }
 
   void showDeleteFaceDialog() async {
+    HapticFeedback.heavyImpact();
+    await Future.delayed(Duration(milliseconds: 100));
+
     final buildContext = context;
     final employee = await showDialog<Employee>(
       context: buildContext,
@@ -214,16 +116,21 @@ class _SettingScreen extends ConsumerState<SettingScreen> {
   }
 
   void setFaceIdForAll(bool value) async {
+    HapticFeedback.heavyImpact();
+
     ref.read(settingScreenStateProvider.notifier).setFaceIDForAll(value);
   }
 
   void setFaceIdForRegisterFace(bool value) async {
+    HapticFeedback.heavyImpact();
+
     ref
         .read(settingScreenStateProvider.notifier)
         .setFaceIDForRegisterFace(value);
   }
 
   void _showAuthenticationDialog() async {
+    HapticFeedback.heavyImpact();
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: true,
@@ -238,39 +145,10 @@ class _SettingScreen extends ConsumerState<SettingScreen> {
   }
 
   Future<void> _uploadArchiveEvent() async {
+    HapticFeedback.heavyImpact();
+    await Future.delayed(Duration(milliseconds: 100));
+
     await ref.read(settingScreenStateProvider.notifier).uploadArchive();
-  }
-
-  void _showUploadSuccessDialog(String message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text("Upload Successful", style: TextStyle(color: Colors.green)),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text("OK"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showUploadErrorDialog(String error) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text("Upload Failed"),
-        content: Text(error),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text("OK"),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -278,12 +156,13 @@ class _SettingScreen extends ConsumerState<SettingScreen> {
     final state = ref.watch(settingScreenStateProvider);
 
     ref.listen(settingScreenStateProvider, (previous, next) {
-      if (next.errorMessage.isNotEmpty) {
+      if (previous?.errorMessage != next.errorMessage &&
+          next.errorMessage.isNotEmpty) {
         showErrorSnackBar(next.errorMessage, context);
         ref.read(settingScreenStateProvider.notifier).setErrorMessage('');
       }
-      if (next.message.isNotEmpty) {
-        showSnackBar(next.errorMessage, context);
+      if (previous?.message != next.message && next.message.isNotEmpty) {
+        showSnackBar(next.message, context);
         ref.read(settingScreenStateProvider.notifier).setMessage('');
       }
     });
@@ -295,14 +174,27 @@ class _SettingScreen extends ConsumerState<SettingScreen> {
         centerTitle: true,
         title: Text(
           "setting".tr(),
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+
+        ),
+        titleTextStyle:TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 20.sp,
+        ) ,
+        leading: IconButton(
+          onPressed: () {
+            HapticFeedback.heavyImpact();
+            Navigator.pop(context);
+          },
+          icon: Icon(Icons.arrow_back_ios, color: Colors.white),
         ),
         actions: [
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 4.r),
             child: IconButton(
-              iconSize: 30.w,
+              iconSize: 30.r,
               onPressed: () {
+                HapticFeedback.heavyImpact();
                 ref.read(settingScreenStateProvider.notifier).syncData();
               },
               icon: Icon(Icons.cloud_download_outlined),
@@ -312,10 +204,10 @@ class _SettingScreen extends ConsumerState<SettingScreen> {
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 4.r),
             child: IconButton(
-              iconSize: 30.w,
+              iconSize: 30.r,
               onPressed: _showAuthenticationDialog,
               icon: Icon(Icons.key),
-              color: MColors().crimsonRed,
+              color: MColors().greenMunsell,
             ),
           ),
         ],
@@ -341,7 +233,7 @@ class _SettingScreen extends ConsumerState<SettingScreen> {
                         width: double.infinity,
                         padding: EdgeInsets.all(10.w),
                         child: Text(
-                          "Face ID Settings",
+                          "face_id_settings".tr(),
                           style: TextStyle(
                             color: Colors.black,
                             fontSize: 18.sp,
@@ -385,80 +277,107 @@ class _SettingScreen extends ConsumerState<SettingScreen> {
                         ),
                       ),
                       20.verticalSpace,
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 10.w),
-                        child: Text(
-                          "num_of_retries".tr(),
-                          style: TextStyle(
-                            fontSize: 14.sp,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                      FancySeekBar(
-                        value: state.faceVerificationTries ?? 6,
-                        max: 9,
-                        min: 3,
-                        onChanged: (value) {
-                          ref
-                              .read(settingScreenStateProvider.notifier)
-                              .setFaceTries(value);
-                        },
-                      ),
+                      // Padding(
+                      //   padding: EdgeInsets.symmetric(horizontal: 10.w),
+                      //   child: Text(
+                      //     "num_of_retries".tr(),
+                      //     style: TextStyle(
+                      //       fontSize: 14.sp,
+                      //       fontWeight: FontWeight.w500,
+                      //     ),
+                      //   ),
+                      // ),
+                      // FancySeekBar(
+                      //   value: state.faceVerificationTries ?? 6,
+                      //   max: 9,
+                      //   min: 3,
+                      //   onChanged: (value) {
+                      //     ref
+                      //         .read(settingScreenStateProvider.notifier)
+                      //         .setFaceTries(value);
+                      //   },
+                      // ),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(6.w),
-                              ),
-                              backgroundColor: Colors.white,
-                            ),
-
-                            onPressed: () {
-                              showIdentificationDialog(false);
-                            },
+                          Expanded(
                             child: Padding(
-                              padding: EdgeInsets.all(12.w),
-                              child: Text(
-                                "register_face_id".tr(),
-                                style: TextStyle(color: Colors.black),
+                              padding: EdgeInsets.symmetric(horizontal: 10.r),
+
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(6.w),
+                                  ),
+                                  backgroundColor: Colors.white,
+                                  padding: EdgeInsets.symmetric(vertical: 13.r),
+                                ),
+
+                                onPressed: () async {
+                                  HapticFeedback.heavyImpact();
+                                  await Future.delayed(
+                                    Duration(milliseconds: 100),
+                                  );
+                                  showIdentificationDialog(false);
+                                },
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    "register_face_id".tr(),
+
+                                    style: TextStyle(
+                                      color: Colors.black,
+                                      fontSize: 11.sp,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(6.w),
-                              ),
-
-                              backgroundColor:
-                                  (state.faces != null &&
-                                      state.faces?.isNotEmpty == true)
-                                  ? Colors.white
-                                  : Colors.white.withAlpha(100),
-                            ),
-
-                            onPressed: () {
-                              print(
-                                "faces=======> size ${state.faces?.length}",
-                              );
-                              if (state.faces != null &&
-                                  state.faces?.isNotEmpty == true) {
-                                showIdentificationDialog(true);
-                              }
-                            },
+                          Expanded(
                             child: Padding(
-                              padding: EdgeInsets.all(12.w),
-                              child: Text(
-                                "edit_face_id".tr(),
-                                style: TextStyle(
-                                  color:
+                              padding: EdgeInsets.symmetric(horizontal: 10.r),
+
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(6.w),
+                                  ),
+
+                                  backgroundColor:
                                       (state.faces != null &&
                                           state.faces?.isNotEmpty == true)
-                                      ? Colors.black
-                                      : Colors.grey.shade600,
+                                      ? Colors.white
+                                      : Colors.white.withAlpha(100),
+                                  padding: EdgeInsets.symmetric(vertical: 13.r),
+                                ),
+
+                                onPressed: () async {
+                                  HapticFeedback.heavyImpact();
+                                  await Future.delayed(
+                                    Duration(milliseconds: 100),
+                                  );
+                                  print(
+                                    "faces=======> size ${state.faces?.length}",
+                                  );
+                                  if (state.faces != null &&
+                                      state.faces?.isNotEmpty == true) {
+                                    showIdentificationDialog(true);
+                                  }
+                                },
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    "edit_face_id".tr(),
+                                    style: TextStyle(
+                                      fontSize: 11.sp,
+                                      color:
+                                          (state.faces != null &&
+                                              state.faces?.isNotEmpty == true)
+                                          ? Colors.black
+                                          : Colors.grey.shade600,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -482,7 +401,10 @@ class _SettingScreen extends ConsumerState<SettingScreen> {
                             padding: EdgeInsets.all(12.w),
                             child: Text(
                               "delete_face_id".tr(),
-                              style: TextStyle(color: Colors.black),
+                              style: TextStyle(
+                                fontSize: 11.sp,
+                                color: Colors.black,
+                              ),
                             ),
                           ),
                         ),
@@ -506,7 +428,10 @@ class _SettingScreen extends ConsumerState<SettingScreen> {
                             padding: EdgeInsets.all(12.w),
                             child: Text(
                               "upload_archive_event".tr(),
-                              style: TextStyle(color: Colors.black),
+                              style: TextStyle(
+                                fontSize: 11.sp,
+                                color: Colors.black,
+                              ),
                             ),
                           ),
                         ),
@@ -525,10 +450,10 @@ class _SettingScreen extends ConsumerState<SettingScreen> {
               height: double.infinity,
               color: Colors.black38,
               child: Center(
-                child: SpinKitCubeGrid(
-                  color: Colors.red,
+                child: SpinKitFadingCube(
+                  color: MColors().crimsonRed,
                   size: 100.0.r,
-                  duration: Duration(milliseconds: 800),
+                  duration: Duration(milliseconds: 1000),
                 ),
               ),
             ),

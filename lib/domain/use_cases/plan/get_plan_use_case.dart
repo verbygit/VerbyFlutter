@@ -9,7 +9,7 @@ class GetPlanUseCase {
 
   GetPlanUseCase(this.planRemoteRepository);
 
-  Future<Either<Failure, String>> call(
+  Future<Either<Failure, List<String>>> call(
     String deviceID,
     int employeeID,
   ) async {

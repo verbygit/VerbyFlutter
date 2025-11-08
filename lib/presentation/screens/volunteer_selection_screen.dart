@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
@@ -46,6 +47,7 @@ class _VolunteerSelectionScreenState
   }
 
   void _clearSearch() {
+    HapticFeedback.heavyImpact();
     _searchController.clear();
   }
 
@@ -64,6 +66,8 @@ class _VolunteerSelectionScreenState
         }
       },
       child: Scaffold(
+        backgroundColor: Colors.white,
+
         body: SafeArea(
           child: Stack(
             children: [
@@ -72,38 +76,52 @@ class _VolunteerSelectionScreenState
                   20.verticalSpace,
                   Container(
                     color: MColors().darkGrey,
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 10.r),
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: InputDecoration(
-                          hintText: "enter_your_name".tr(),
-                          hintStyle: TextStyle(
-                            fontSize: 16.sp,
-                            color: Colors.grey,
-                          ),
-                          prefixIcon: Icon(
-                            Icons.search,
-                            size: 20.r,
-                            color: Colors.white,
-                          ),
-                          suffixIcon: _searchController.text.isNotEmpty
-                              ? IconButton(
-                                  icon: Icon(
-                                    Icons.clear,
-                                    size: 20.r,
-                                    color: Colors.white,
-                                  ),
-                                  onPressed: _clearSearch,
-                                )
-                              : null,
-                          contentPadding: EdgeInsets.symmetric(
-                            vertical: 12.r,
-                            horizontal: 16.r,
-                          ),
+                    padding: EdgeInsets.symmetric(vertical: 10.r),
+
+                    child: Row(
+                      children: [
+                        IconButton(
+                          onPressed: () {
+                            HapticFeedback.heavyImpact();
+                            Navigator.pop(context);
+                          },
+                          icon: Icon(Icons.arrow_back_ios, color: Colors.white),
                         ),
-                        style: TextStyle(fontSize: 16.sp, color: Colors.white),
-                      ),
+
+                        Flexible(
+                          child: TextField(
+                          controller: _searchController,
+                          decoration: InputDecoration(
+                            hintText: "enter_your_name".tr(),
+                            hintStyle: TextStyle(
+                              fontSize: 16.sp,
+                              color: Colors.grey,
+                            ),
+                            prefixIcon: Icon(
+                              Icons.search,
+                              size: 20.r,
+                              color: Colors.white,
+                            ),
+                            suffixIcon: _searchController.text.isNotEmpty
+                                ? IconButton(
+                                    icon: Icon(
+                                      Icons.clear,
+                                      size: 20.r,
+                                      color: Colors.white,
+                                    ),
+                                    onPressed: _clearSearch,
+                                  )
+                                : null,
+                            contentPadding: EdgeInsets.symmetric(
+                              vertical: 12.r,
+                              horizontal: 16.r,
+                            ),
+                          ),
+                          style: TextStyle(fontSize: 16.sp, color: Colors.white),
+                                                ),
+                        ),
+
+                      ]
                     ),
                   ),
 
@@ -116,6 +134,7 @@ class _VolunteerSelectionScreenState
                           padding: EdgeInsets.all(10.r),
                           child: ListTile(
                             onTap: () {
+                              HapticFeedback.heavyImpact();
                               print("select item");
                               ref
                                   .read(volunteerScreenStateProvider.notifier)
@@ -145,7 +164,7 @@ class _VolunteerSelectionScreenState
                   ),
                   GestureDetector(
                     onTap: () {
-
+                      HapticFeedback.heavyImpact();
                       Navigator.pop(
                         context,
                         state.filterList?[state.selectedIndex].id,
@@ -177,10 +196,10 @@ class _VolunteerSelectionScreenState
                   height: double.infinity,
                   color: Colors.black38,
                   child: Center(
-                    child: SpinKitCubeGrid(
-                      color: Colors.red,
+                    child: SpinKitFadingCube(
+                      color: MColors().crimsonRed,
                       size: 100.0.r,
-                      duration: Duration(milliseconds: 800),
+                      duration: Duration(milliseconds: 1000),
                     ),
                   ),
                 ),

@@ -6,7 +6,14 @@ class DepaRestant {
   int? volunteer;
   int? status;
 
-  DepaRestant({this.id, this.name, this.category, this.extra,this.volunteer,this.status});
+  DepaRestant({
+    this.id,
+    this.name,
+    this.category,
+    this.extra,
+    this.volunteer,
+    this.status,
+  });
 
   DepaRestant.fromJson(Map<String, dynamic> json) {
     id = json['id'];
@@ -23,7 +30,9 @@ class DepaRestant {
     data['name'] = name;
     data['category'] = category;
     data['extra'] = extra;
-    data['volunteer'] = volunteer;
+    if (volunteer != null && volunteer != 0) {
+      data['volunteer'] = volunteer;
+    }
     data['status'] = status;
     return data;
   }

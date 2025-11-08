@@ -4,6 +4,8 @@ import 'package:flutter_styled_toast/flutter_styled_toast.dart';
 import '../presentation/theme/colors.dart';
 
 showSnackBar(String text, BuildContext context) {
+  print("show toast =============> $text");
+
   showToast(
     text,
     position: StyledToastPosition.center,
@@ -16,6 +18,7 @@ showSnackBar(String text, BuildContext context) {
       fontSize: 22.sp,
       color: Colors.white,
     ),
+    textAlign: TextAlign.center,
     animDuration: Duration.zero,
   );
 }
@@ -36,3 +39,5 @@ showErrorSnackBar(String text, BuildContext context) {
     animDuration: Duration.zero,
   );
 }
+
+bool isDigits(String s) => RegExp(r'^\d+$').hasMatch(s);

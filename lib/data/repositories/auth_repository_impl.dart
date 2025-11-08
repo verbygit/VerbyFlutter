@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dartz/dartz.dart';
 import 'package:intl/intl.dart';
 import 'package:verby_flutter/data/data_source/remote/api_client.dart';
+import 'package:verby_flutter/data/models/remote/device_response.dart';
 import 'package:verby_flutter/data/models/remote/login_response_model.dart';
 import 'package:verby_flutter/domain/core/failure.dart';
 import 'package:verby_flutter/domain/repositories/auth_repository.dart';
@@ -47,5 +48,11 @@ class AuthRepositoryImpl extends AuthRepository {
     // apiService.clearAuthToken();
   }
 
-
+  @override
+  Future<Either<Failure, DeviceResponse>> getDeviceInfo(String deviceID) async {
+    return await apiService.get(
+      ApiConstant.deviceInfo(deviceID),
+      fromJson: (data) => DeviceResponse.fromJson(data),
+    );
+  }
 }

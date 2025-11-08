@@ -59,6 +59,7 @@ dependencies:
 
   camera: ^0.10.5+9
   image: ^4.5.4
+  image_picker: ^1.0.7
   google_mlkit_face_detection: ^0.13.1
   google_mlkit_commons: ^0.11.0
   flutter_secure_storage: ^9.0.0
@@ -74,6 +75,10 @@ dependencies:
   firebase_core: ^4.1.1
   firebase_crashlytics: ^5.0.2
   tflite_flutter: ^0.11.0
+  #  url_launcher: ^6.3.2
+  haptic_feedback: ^0.5.1+1
+  flutter_native_splash: ^2.4.6
+  # kiosk_mode: ^0.2.0  # Temporarily disabled due to build issues
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -84,6 +89,12 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+
+flutter_native_splash:
+  background_image: assets/images/verby_splash.png
+  #    color: "#ffffff"
+  ios: true
+  android: false
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

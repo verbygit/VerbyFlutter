@@ -20,6 +20,7 @@ import 'package:verby_flutter/domain/entities/states/empPerformAndActionState.da
 import 'package:verby_flutter/domain/use_cases/depa_restant/delete_depa_restants_use_case.dart';
 import 'package:verby_flutter/domain/use_cases/employee/delete_performance_state_use_case.dart';
 import 'package:verby_flutter/domain/use_cases/employee/get_emp_perform_state_by_id_use_case.dart';
+import 'package:verby_flutter/domain/use_cases/plan/get_plan_by_emp_id_use_case.dart';
 import 'package:verby_flutter/domain/use_cases/record/create_record_remotely__use_case.dart';
 import 'package:verby_flutter/domain/use_cases/record/get_local_record_usecase.dart';
 import 'package:verby_flutter/domain/use_cases/record/insert_local_record_use_case.dart';
@@ -31,11 +32,13 @@ import 'package:verby_flutter/presentation/providers/usecase/employee/get_emp_ac
 import 'package:verby_flutter/presentation/providers/usecase/employee/get_emp_perform_state_by_id_usecase.dart';
 import 'package:verby_flutter/presentation/providers/usecase/employee/insert_emp_action_state_usecase.dart';
 import 'package:verby_flutter/presentation/providers/usecase/employee/insert_employee_perform_state_usecase.dart';
+import 'package:verby_flutter/presentation/providers/usecase/plan/get_plan_by_emp_id_usecase_provider.dart';
 
 import 'package:verby_flutter/presentation/providers/usecase/record/create__remote_record.dart';
 import 'package:verby_flutter/presentation/providers/usecase/record/get_records_usecase_provider.dart';
 import 'package:verby_flutter/presentation/providers/usecase/record/insert_record_usecase_provider.dart';
 import 'package:verby_flutter/presentation/providers/usecase/sync/sync_data_use_case_provider.dart';
+import 'package:verby_flutter/utils/helper_functions.dart';
 
 import '../../data/models/local/employee_action_state.dart';
 import '../../data/models/remote/user_model.dart';
@@ -57,6 +60,7 @@ class EmpPerformAndActionStateNotifier
   final InsertLocalRecordUseCase _insertLocalRecordUseCase;
   final SyncDataUseCase _syncDataUseCase;
   final GetLocalRecordUseCase getLocalRecordUseCase;
+  final GetPlanByEmpIdUseCase _getPlanByEmpIdUseCase;
 
   EmpPerformAndActionStateNotifier(
     this._insertEmpPerformState,
@@ -70,6 +74,7 @@ class EmpPerformAndActionStateNotifier
     this._insertLocalRecordUseCase,
     this._syncDataUseCase,
     this.getLocalRecordUseCase,
+    this._getPlanByEmpIdUseCase,
   ) : super(
         EmployeePerformAndActionState(
           isInternetConnected: ConnectivityHelper().isConnected,
@@ -123,7 +128,7 @@ class EmpPerformAndActionStateNotifier
     if (employee.id != null) {
       await setCurrentPerformAndActionState(employee.id!);
     }
-    state = state.copyWith(isLoading: false,);
+    state = state.copyWith(isLoading: false);
   }
 
   Future<void> syncData(Employee employee) async {
@@ -153,13 +158,49 @@ class EmpPerformAndActionStateNotifier
     state = state.copyWith(isLoading: false);
   }
 
+  Future<bool> canCreatePoint(int empId) async {
+    final planResult = await _getPlanByEmpIdUseCase.call(empId.toString());
+
+    return await planResult.fold(
+      (onError) async {
+        return false;
+      },
+      (onData) async {
+        if (onData.time.isNotEmpty && isDigits(onData.time[0])) {
+          DateTime now = DateTime.now();
+          DateTime serverTime = DateTime(
+            now.year,
+            now.month,
+            now.day,
+            int.parse(onData.time[0]),
+          );
+          if (now.isBefore(serverTime)) {
+            return false;
+          } else {
+            return true;
+          }
+          return true;
+        } else {
+          return false;
+        }
+      },
+    );
+  }
+
   Future<bool> createRecord(
     Employee employee,
     Perform perform,
     Action action,
+    int identity,
     List<DepaRestantModel?>? depa,
     List<DepaRestantModel?>? restant,
   ) async {
+    if (action == Action.CHECKIN) {
+      if (!await canCreatePoint(employee.id ?? -1)) {
+        state = state.copyWith(errorMessage: "you_are_not_scheduled".tr());
+        return false;
+      }
+    }
     state = state.copyWith(isLoading: true);
     final user = state.user;
 
@@ -183,7 +224,7 @@ class EmpPerformAndActionStateNotifier
       device: user?.deviceID ?? -1,
       action: action.getActionValue(),
       perform: perform.getPerformValue(),
-      identity: 1,
+      identity: identity,
       time: time,
       depa: depaRecordList,
       restant: restantRecordList,
@@ -215,7 +256,6 @@ class EmpPerformAndActionStateNotifier
       _deleteEmpPerformState.call(employee.id.toString());
     }
     String successMessage = createSuccessMessage(empActionState, action);
-    state = state.copyWith(message: successMessage);
     await deleteDepaRestants(depa, restant);
     state = state.copyWith(isLoading: false, message: successMessage);
     return true;
@@ -293,14 +333,20 @@ class EmpPerformAndActionStateNotifier
     EmployeeActionState empActionState,
     Action action,
   ) {
-    if (action != Action.CHECKOUT) return "thank".tr();
+    if (action != Action.CHECKOUT) {
+      print("message on record create ====>" + "thank".tr());
+      return "thank".tr();
+    }
     double workerHours = DateTimeHelper.getWorkingHours(
       empActionState.lastActionTime,
     );
 
     if (workerHours > 5.5 && empActionState.hadAPause == false) {
+      print("message on record create ====>" + "thank_with_pause".tr());
       return "thank_with_pause".tr();
     } else {
+      print("message on record create ====>" + "thank".tr());
+
       return "thank".tr();
     }
   }
@@ -452,6 +498,7 @@ final empPerformAndActionStateProvider =
       final deleteEmpPerformStateUseCase = ref.read(
         deleteEmpPerformStateProvider,
       );
+      final getPlanByEmpId = ref.read(getPlanByEmpIdProvider);
       final getRecordUseCase = ref.read(getRecordsUseCaseProvider);
       final insertRecordUseCase = ref.read(insertRecordUseCaseProvider);
       final deleteDepaRestantsUseCase = ref.read(deleteDepaRestantProvider);
@@ -468,5 +515,6 @@ final empPerformAndActionStateProvider =
         insertRecordUseCase,
         syncDataUseCase,
         getRecordUseCase,
+        getPlanByEmpId,
       );
     });

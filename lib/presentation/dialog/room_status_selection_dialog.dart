@@ -1,5 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:verby_flutter/data/models/local/depa_restant_model.dart';
 import 'package:verby_flutter/presentation/screens/volunteer_selection_screen.dart';
@@ -43,41 +44,43 @@ class RoomStatusSelectionDialog extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                SizedBox(
-                  width: 145.w,
-                  child: ElevatedButton(
-                    onPressed: ()  {
+                Expanded(
+                  child: InkWell(
+                    onTap: () async {
+                      HapticFeedback.heavyImpact();
+                      await Future.delayed(Duration(milliseconds: 100));
 
-
-                        depaRestantModel.status = 2;
-                        Navigator.pop(context, depaRestantModel);
-
+                      depaRestantModel.status = 2;
+                      Navigator.pop(context, depaRestantModel);
                     },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: MColors().crimsonRed,
-                    ),
-
                     child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 8.5.r,
-                        vertical: 20.r,
-                      ),
-                      child: Center(
-                        child: Text(
-                          "red_card".tr().toUpperCase(),
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12.sp,
+                      padding: EdgeInsets.symmetric(vertical: 10.r),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: MColors().crimsonRed,
+                          borderRadius: BorderRadius.circular(30.r),
+                        ),
+                        padding: EdgeInsets.symmetric(vertical: 15.r,horizontal: 10.r),
+                        child: Center(
+                          child: Text(
+                            "red_card".tr().toUpperCase(),
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
                 ),
-                SizedBox(
-                  width: 145.w,
-                  child: ElevatedButton(
-                    onPressed: () async {
+                10.horizontalSpace,
+                Expanded(
+                  child: InkWell(
+                    onTap: () async {
+                      HapticFeedback.heavyImpact();
+                      await Future.delayed(Duration(milliseconds: 100));
                       final result = await Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -89,25 +92,27 @@ class RoomStatusSelectionDialog extends StatelessWidget {
                         depaRestantModel.volunteer = result;
                         depaRestantModel.status = 3;
                         Navigator.pop(context, depaRestantModel);
-
                       }
-
                     },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: MColors().chartreuse,
-                    ),
-
                     child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 8.5.r,
-                        vertical: 20.r,
-                      ),
-                      child: Center(
-                        child: Text(
-                          "had_volunteer".tr().toUpperCase(),
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12.sp,
+                      padding: EdgeInsets.symmetric(vertical: 10.r),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: MColors().chartreuse,
+                          borderRadius: BorderRadius.circular(30.r),
+                        ),
+                        padding: EdgeInsets.symmetric(vertical: 15.r,horizontal: 10.r),
+                        child: Center(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              "had_volunteer".tr().toUpperCase(),
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12.sp,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -117,31 +122,40 @@ class RoomStatusSelectionDialog extends StatelessWidget {
               ],
             ),
           ),
-          20.verticalSpace,
-          SizedBox(
-            child: ElevatedButton(
-              onPressed: ()  {
+          Padding(
+            padding: EdgeInsets.symmetric( horizontal: 75.r),
+            child: InkWell(
+              onTap: () async{
+                HapticFeedback.heavyImpact();
+                await Future.delayed(Duration(milliseconds: 100));
 
-                  depaRestantModel.status = 0;
-                  Navigator.pop(context, depaRestantModel);
-
+                depaRestantModel.status = 0;
+                Navigator.pop(context, depaRestantModel);
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: MColors().mediumDarkGray,
-              ),
+
               child: Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: 8.5.r,
-                  vertical: 20.r,
-                ),
-                child: Text(
-                  "did_not_clean".tr().toUpperCase(),
-                  style: TextStyle(color: Colors.white, fontSize: 12.sp),
-                  textAlign: TextAlign.center,
+                padding: EdgeInsets.symmetric( vertical: 20.r),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: MColors().mediumDarkGray,
+                    borderRadius: BorderRadius.circular(30.r),
+                  ),
+                  padding: EdgeInsets.symmetric(vertical: 15.r,horizontal: 10.r),
+                  child: Center(
+                    child: Text(
+                      "did_not_clean".tr().toUpperCase(),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
+
           30.verticalSpace,
         ],
       ),

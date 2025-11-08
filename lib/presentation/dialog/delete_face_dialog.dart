@@ -27,6 +27,7 @@ class _DeleteFaceDialogState extends ConsumerState<DeleteFaceDialog> {
   FocusNode? _focusNode;
 
   Future<void> _checkEmployeeID() async {
+    HapticFeedback.heavyImpact();
     if (_idController.text.isEmpty) {
       ref
           .read(identificationDialogProvider.notifier)

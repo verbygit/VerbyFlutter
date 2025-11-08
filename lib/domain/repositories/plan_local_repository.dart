@@ -10,5 +10,5 @@ abstract class PlanLocalRepository {
 
   Future<Either<String, List<Plan>>> getPlans();
 
-  Future<Either<String, Plan?>> getPlanByEmployeeId(String id);
+  Future<Either<String, Plan>> getPlanByEmployeeId(String id);
 }

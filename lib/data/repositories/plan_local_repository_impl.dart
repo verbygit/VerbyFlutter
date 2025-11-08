@@ -41,16 +41,21 @@ class PlanLocalRepositoryImpl extends PlanLocalRepository {
   }
 
   @override
-  Future<Either<String, Plan?>> getPlanByEmployeeId(String id) async {
+  Future<Either<String, Plan>> getPlanByEmployeeId(String id) async {
     try {
       final result = await planDao.getPlanByEmployeeId(id);
 
-      return Right(result);
+      if (result!=null) {
+        return Right(result);
+      }else{
+        return Left("not found");
+
+      }
     } catch (e) {
       if (kDebugMode) {
         print(e);
       }
-      return left(e.toString());
+      return Left(e.toString());
     }
   }
 }

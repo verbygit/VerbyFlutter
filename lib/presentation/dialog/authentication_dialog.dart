@@ -50,6 +50,7 @@ class _AuthenticationDialogState extends ConsumerState<AuthenticationDialog> {
   }
 
   void login() async {
+    HapticFeedback.heavyImpact();
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -172,6 +173,7 @@ class _AuthenticationDialogState extends ConsumerState<AuthenticationDialog> {
                                   : Icons.visibility_off,
                             ),
                             onPressed: () {
+                              HapticFeedback.heavyImpact();
                               setState(() {
                                 _obscureText =
                                     !_obscureText; // Toggle visibility

@@ -9,6 +9,9 @@ class ApiConstant{
   static  String checkPassword(String deviceID,){
     return "devices/$deviceID/passcheck";
   }
+  static  String deviceInfo(String deviceID,){
+    return "devices/$deviceID";
+  }
   static  String records(String employeeID,){
     return "records/$employeeID/get";
   }

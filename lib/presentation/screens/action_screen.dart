@@ -2,10 +2,10 @@ import 'dart:io';
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart' hide Action;
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
-import 'package:lottie/lottie.dart';
 import 'package:verby_flutter/data/models/remote/employee.dart';
 import 'package:verby_flutter/domain/core/connectivity_helper.dart';
 import 'package:verby_flutter/domain/entities/perform.dart';
@@ -21,11 +21,13 @@ import 'loader_screen.dart';
 class ActionScreen extends ConsumerStatefulWidget {
   final Perform perform;
   final Employee employee;
+  final bool isFaceVerification;
 
   const ActionScreen({
     super.key,
     required this.perform,
     required this.employee,
+    required this.isFaceVerification,
   });
 
   @override
@@ -35,15 +37,13 @@ class ActionScreen extends ConsumerStatefulWidget {
 }
 
 class _ActionScreen extends ConsumerState<ActionScreen> {
-
   @override
   void initState() {
     super.initState();
 
-    WidgetsBinding.instance.addPostFrameCallback((ctx){
-
-    });
+    WidgetsBinding.instance.addPostFrameCallback((ctx) {});
   }
+
   Widget _rowButtonWithIcon({
     String firstButtonName = "",
     String secondButtonName = "",
@@ -56,56 +56,79 @@ class _ActionScreen extends ConsumerState<ActionScreen> {
     Color? firstIconColor,
     Color? secondIconColor,
   }) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        Column(
-          children: [
-            Icon(firstButtonIcon, size: 70.w, color: firstIconColor),
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 10.r),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          Expanded(
+            child: Column(
+              children: [
+                Icon(firstButtonIcon, size: 70.w, color: firstIconColor),
 
-            SizedBox(
-              width: 170.w,
-              child: ElevatedButton(
-                onPressed: firstButtonOnPressed,
+                InkWell(
+                  onTap: firstButtonOnPressed,
 
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: firstButtonColor,
-                ),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20.r),
-                  child: Text(
-                    firstButtonName,
-                    style: TextStyle(color: Colors.white, fontSize: 15.sp),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 15.r),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: firstButtonColor,
+                        borderRadius: BorderRadius.circular(30.r),
+                      ),
+                      padding: EdgeInsets.symmetric(vertical: 20.r),
+                      child: Center(
+                        child: Text(
+                          firstButtonName,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15.sp,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
+          ),
+          10.horizontalSpace,
+          Expanded(
+            child: Column(
+              children: [
+                Icon(secondButtonIcon, size: 70.w, color: secondIconColor),
 
-        Column(
-          children: [
-            Icon(secondButtonIcon, size: 70.w, color: secondIconColor),
+                InkWell(
+                  onTap: secondButtonOnPressed,
 
-            SizedBox(
-              width: 170.w,
-              child: ElevatedButton(
-                onPressed: secondButtonOnPressed,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: secondButtonColor,
-                ),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20.r),
-                  child: Text(
-                    secondButtonName,
-                    style: TextStyle(color: Colors.white, fontSize: 15.sp),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 15.r),
+
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: secondButtonColor,
+                        borderRadius: BorderRadius.circular(30.r),
+                      ),
+                      padding: EdgeInsets.symmetric(vertical: 20.r),
+                      child: Center(
+                        child: Text(
+                          secondButtonName,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15.sp,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -139,10 +162,17 @@ class _ActionScreen extends ConsumerState<ActionScreen> {
   ) async {
     final result = await ref
         .read(empPerformAndActionStateProvider.notifier)
-        .createRecord(widget.employee, widget.perform, action, depa, restant);
+        .createRecord(
+          widget.employee,
+          widget.perform,
+          action,
+          widget.isFaceVerification ? 2 : 1,
+          depa,
+          restant,
+        );
     if (result) {
       // Play thank you sound based on current language
-       SoundService.playThankYouSound(context);
+      SoundService.playThankYouSound(context);
       Navigator.popUntil(context, (Route<dynamic> route) => route.isFirst);
     }
   }
@@ -152,16 +182,22 @@ class _ActionScreen extends ConsumerState<ActionScreen> {
     final state = ref.watch(empPerformAndActionStateProvider);
 
     ref.listen(empPerformAndActionStateProvider, (previous, next) {
-      if (previous?.errorMessage != next.errorMessage) {
-        showErrorSnackBar(next.errorMessage, context);
-        ref.read(empPerformAndActionStateProvider.notifier).setErrorMessage("");
-      }
+      if (mounted) {
+        if (previous?.errorMessage != next.errorMessage) {
+          showErrorSnackBar(next.errorMessage, context);
+          ref
+              .read(empPerformAndActionStateProvider.notifier)
+              .setErrorMessage("");
+        }
 
-      if (previous?.message != next.message && next.message.isNotEmpty) {
-        showSnackBar(next.message, context);
-        ref
-            .read(empPerformAndActionStateProvider.notifier)
-            .setSuccessMessage("");
+        if (previous?.message != next.message && next.message.isNotEmpty) {
+          print("message on record create in listener ====> ${next.message}");
+
+          showSnackBar(next.message, context);
+          ref
+              .read(empPerformAndActionStateProvider.notifier)
+              .setSuccessMessage("");
+        }
       }
     });
     return GestureDetector(
@@ -169,23 +205,30 @@ class _ActionScreen extends ConsumerState<ActionScreen> {
         // Detect left-to-right swipe (iOS back gesture)
         if (Platform.isIOS) {
           if (details.delta.dx > 5) {
-                    // Adjust sensitivity as needed
-                    Navigator.pop(context);
-                  }
+            // Adjust sensitivity as needed
+            Navigator.pop(context);
+          }
         }
       },
       child: Scaffold(
+        backgroundColor: Colors.white,
         appBar: AppBar(
           backgroundColor: MColors().darkGrey,
           automaticallyImplyLeading: false,
-          title: Center(
-            child: Text(
-              "chose_operation".tr(),
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 25.sp,
-              ),
+          centerTitle: true,
+          leading: IconButton(
+            onPressed: () {
+              HapticFeedback.heavyImpact();
+              Navigator.pop(context);
+            },
+            icon: Icon(Icons.arrow_back_ios, color: Colors.white),
+          ),
+          title: Text(
+            "chose_action".tr(),
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 20.sp,
             ),
           ),
         ),
@@ -204,25 +247,30 @@ class _ActionScreen extends ConsumerState<ActionScreen> {
                     secondButtonIcon: Icons.stop_outlined,
                     firstButtonOnPressed:
                         state.currentEmpActionState?.checkedIn ?? true
-                        ? () {
-                            _createRecord(Action.CHECKIN);
+                        ? ()async {
+                      HapticFeedback.heavyImpact();
+                      await Future.delayed(Duration(milliseconds: 100));
+                      _createRecord(Action.CHECKIN);
                           }
                         : null,
                     secondButtonOnPressed:
                         state.currentEmpActionState?.checkedOut ?? true
-                        ? () {
+                        ? () async{
+                          HapticFeedback.heavyImpact();
+                          await Future.delayed(Duration(milliseconds: 100));
                             _createRecord(Action.CHECKOUT);
                           }
                         : null,
                     firstButtonColor:
                         state.currentEmpActionState?.checkedIn ?? true
                         ? Colors.black
-                        : MColors().darkGrey,
+                        : MColors().darkGrey50Opacity,
                     secondButtonColor:
                         state.currentEmpActionState?.checkedOut ?? true
                         ? Colors.black
-                        : MColors().darkGrey,
-                    firstIconColor: state.currentEmpActionState?.checkedIn ?? true
+                        : MColors().darkGrey50Opacity,
+                    firstIconColor:
+                        state.currentEmpActionState?.checkedIn ?? true
                         ? MColors().freshGreen
                         : MColors().veryLightGray2,
                     secondIconColor:
@@ -230,7 +278,7 @@ class _ActionScreen extends ConsumerState<ActionScreen> {
                         ? MColors().crimsonRed
                         : MColors().veryLightGray2,
                   ),
-                  40.verticalSpace,
+                  20.verticalSpace,
                   _rowButtonWithIcon(
                     firstButtonName: "pause-in".tr().toUpperCase(),
                     secondButtonName: "pause-out".tr().toUpperCase(),
@@ -238,25 +286,30 @@ class _ActionScreen extends ConsumerState<ActionScreen> {
                     secondButtonIcon: Icons.refresh,
                     firstButtonOnPressed:
                         state.currentEmpActionState?.pausedIn ?? true
-                        ? () {
+                        ? () async{
+                          HapticFeedback.heavyImpact();
+                          await Future.delayed(Duration(milliseconds: 100));
                             _createRecord(Action.PAUSEIN);
                           }
                         : null,
                     secondButtonOnPressed:
                         state.currentEmpActionState?.pausedOut ?? true
-                        ? () {
+                        ? () async{
+                          HapticFeedback.heavyImpact();
+                          await Future.delayed(Duration(milliseconds: 100));
                             _createRecord(Action.PAUSEOUT);
                           }
                         : null,
                     firstButtonColor:
                         state.currentEmpActionState?.pausedIn ?? true
                         ? Colors.black
-                        : MColors().darkGrey,
+                        : MColors().darkGrey50Opacity,
                     secondButtonColor:
                         state.currentEmpActionState?.pausedOut ?? true
                         ? Colors.black
-                        : MColors().darkGrey,
-                    firstIconColor: state.currentEmpActionState?.pausedIn ?? true
+                        : MColors().darkGrey50Opacity,
+                    firstIconColor:
+                        state.currentEmpActionState?.pausedIn ?? true
                         ? MColors().amber
                         : MColors().veryLightGray2,
                     secondIconColor:
@@ -273,10 +326,10 @@ class _ActionScreen extends ConsumerState<ActionScreen> {
                 height: double.infinity,
                 color: Colors.black38,
                 child: Center(
-                  child: SpinKitCubeGrid(
-                    color: Colors.red,
+                  child: SpinKitFadingCube(
+                    color: MColors().crimsonRed,
                     size: 100.0.r,
-                    duration: Duration(milliseconds: 800),
+                    duration: Duration(milliseconds: 1000),
                   ),
                 ),
               ),

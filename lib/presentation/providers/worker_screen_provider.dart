@@ -1,7 +1,7 @@
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:verby_flutter/data/models/local/face_model.dart';
 import 'package:verby_flutter/data/models/remote/record/CreateRecordRequest.dart';
@@ -12,6 +12,7 @@ import 'package:verby_flutter/domain/use_cases/record/create_multi_record_remote
 import 'package:verby_flutter/domain/use_cases/record/get_local_record_usecase.dart';
 import 'package:verby_flutter/domain/use_cases/sync/sync_data_use_case.dart';
 import 'package:verby_flutter/presentation/providers/reposiory/face_repo_provider.dart';
+import 'package:verby_flutter/presentation/providers/usecase/backup/upload_archive_use_case_provider.dart';
 import 'package:verby_flutter/presentation/providers/usecase/employee/get_local_employee_usecase_provider.dart';
 import 'package:verby_flutter/presentation/providers/usecase/record/clear_record_usecase_provider.dart';
 import 'package:verby_flutter/presentation/providers/usecase/record/create_multi_remote_record.dart';
@@ -23,6 +24,7 @@ import '../../data/models/remote/record/create_multi_record_request.dart';
 import '../../domain/core/connectivity_helper.dart';
 import '../../domain/entities/states/worker_screen_state.dart';
 import '../../domain/repositories/face_repository.dart';
+import '../../domain/use_cases/backup/delete_archive_use_case.dart';
 
 class WorkerScreenProviderNotifier extends StateNotifier<WorkerScreenState> {
   final GetLocalEmployeeUseCase _getLocalEmpUseCase;
@@ -31,6 +33,7 @@ class WorkerScreenProviderNotifier extends StateNotifier<WorkerScreenState> {
   final ClearRecordUseCase _clearRecordUseCase;
   final SyncDataUseCase _syncDataUseCase;
   final FaceRepository faceRepository;
+  final DeleteArchiveUseCase _deleteArchiveUseCase;
 
   WorkerScreenProviderNotifier(
     this._getLocalEmpUseCase,
@@ -39,13 +42,18 @@ class WorkerScreenProviderNotifier extends StateNotifier<WorkerScreenState> {
     this._clearRecordUseCase,
     this._syncDataUseCase,
     this.faceRepository,
+    this._deleteArchiveUseCase,
   ) : super(WorkerScreenState()) {
     getEmployees();
     setSharedPreferencesHelper();
   }
 
-  listenToInternetStatus() {
+  Future<void> listenToInternetStatus() async {
+    var connectivityResult = await Connectivity().checkConnectivity();
+    saveInternetStatus(connectivityResult.isNotEmpty && connectivityResult[0] != ConnectivityResult.none);
+
     ConnectivityHelper().onStatusChange.listen((onData) {
+      print("internet status =======> $onData");
       if (onData == ConnectivityStatus.online) {
         saveInternetStatus(true);
       } else {
@@ -84,7 +92,10 @@ class WorkerScreenProviderNotifier extends StateNotifier<WorkerScreenState> {
           state.userModel?.deviceID != null) {
         final result = await _syncDataUseCase.syncData(state.userModel!, true);
         if (result.isNotEmpty) {
-          setErrorMessage(result);
+          if (kDebugMode) {
+            print(result);
+          }
+          setErrorMessage("sync_failed".tr());
         }
       }
     }
@@ -158,6 +169,7 @@ class WorkerScreenProviderNotifier extends StateNotifier<WorkerScreenState> {
             },
             (onData) async {
               await _clearRecordUseCase.call();
+              await _deleteArchiveUseCase.call();
               state = state.copyWith(message: "record_sent_success".tr());
             },
           );
@@ -224,6 +236,8 @@ final workerScreenProvider =
       final clearLocalRecordUseCase = ref.read(clearRecordUseCaseProvider);
       final syncDataUseCase = ref.read(syncDataUseCaseProvider);
       final faceRepository = ref.read(faceRepoProvider);
+      final deleteArchiveUseCase = ref.read(deleteArchiveUseCaseProvider);
+
       return WorkerScreenProviderNotifier(
         getLocalEmpUseCase,
         createMultiRecordsUseCase,
@@ -231,5 +245,6 @@ final workerScreenProvider =
         clearLocalRecordUseCase,
         syncDataUseCase,
         faceRepository,
+        deleteArchiveUseCase,
       );
     });

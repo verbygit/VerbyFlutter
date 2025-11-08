@@ -16,17 +16,30 @@ class TextSwitch extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(text,style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w500),),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            text,
+            style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w500),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        5.horizontalSpace,
         Theme(
           data: Theme.of(context).copyWith(
             switchTheme: SwitchThemeData(
-              trackOutlineColor: MaterialStateProperty.all(Colors.transparent),
+              trackOutlineColor: MaterialStateProperty.all(
+                Colors.transparent,
+              ),
             ),
           ),
-          child: Switch(
-            value: isChecked,
-            onChanged: onChanged,
-            activeColor: MColors().greenMunsell,
+          child: Transform.scale(
+            scale: 0.7.r,
+            child: Switch(
+              value: isChecked,
+              onChanged: onChanged,
+              activeColor: MColors().greenMunsell,
+            ),
           ),
         ),
       ],

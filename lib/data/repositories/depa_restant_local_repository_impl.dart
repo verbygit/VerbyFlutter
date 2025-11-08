@@ -61,4 +61,9 @@ class DepaRestantLocalRepositoryImpl extends DepaRestantLocalRepository {
   Future<bool> deleteDepaRestants(List<String> roomId) {
     return depaRestantDao.deleteDepaRestants(roomId);
   }
+
+  @override
+  Future<bool> deleteDepaRestantsByEmpId(String empId) {
+    return depaRestantDao.deleteDepaRestantsByEmployeeId(empId);
+  }
 }

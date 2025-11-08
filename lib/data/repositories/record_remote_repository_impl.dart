@@ -1,4 +1,5 @@
 import 'package:dartz/dartz.dart';
+import 'package:flutter/foundation.dart';
 import 'package:verby_flutter/core/api_constant.dart';
 import 'package:verby_flutter/data/models/remote/employee_list_response.dart';
 import 'package:verby_flutter/data/models/remote/record/CreateRecordRequest.dart';
@@ -40,6 +41,9 @@ class RecordRemoteRepositoryImpl extends RecordRemoteRepository {
   Future<Either<Failure, ServerResponse>> createMultiRecord(
     CreateMultiRecordRequest createRecordRequest,
   ) async {
+    if (kDebugMode) {
+      print("createMultiRecord request : ${createRecordRequest.toJson()}");
+    }
     return apiService.post(
       ApiConstant.createMultipleRecord,
       data: createRecordRequest.toJson(),

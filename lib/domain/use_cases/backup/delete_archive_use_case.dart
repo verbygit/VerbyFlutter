@@ -7,6 +7,6 @@ class DeleteArchiveUseCase {
   DeleteArchiveUseCase(this._backupService);
 
   Future<Either<String, bool>> call() async {
-    return await _backupService.deleteOriginalAndroidFile();
+    return await _backupService.deleteBackupFile();
   }
 }

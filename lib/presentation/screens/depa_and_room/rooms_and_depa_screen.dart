@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/src/widgets/framework.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -13,6 +14,7 @@ import 'package:verby_flutter/presentation/dialog/room_status_selection_dialog.d
 import 'package:verby_flutter/presentation/screens/depa_and_room/room_item.dart';
 
 import '../../../data/models/local/depa_restant_model.dart';
+import '../../../domain/entities/room_status.dart';
 import '../../providers/depa_restant_state_provider.dart';
 import '../../theme/colors.dart';
 
@@ -67,19 +69,26 @@ class _RoomAndDepaScreenState extends ConsumerState<RoomAndDepaScreen> {
         }
       },
       child: Scaffold(
+        backgroundColor: Colors.white,
         appBar: AppBar(
           backgroundColor: MColors().darkGrey,
-
-          title: Center(
-            child: Text(
-              "rooms".tr(),
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 25.sp,
-              ),
-              textAlign: TextAlign.center,
+          centerTitle: true,
+          automaticallyImplyLeading: false,
+          leading: IconButton(
+            onPressed: () {
+              HapticFeedback.heavyImpact();
+              Navigator.pop(context);
+            },
+            icon: Icon(Icons.arrow_back_ios, color: Colors.white),
+          ),
+          title: Text(
+            "rooms".tr(),
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 20.sp,
             ),
+            textAlign: TextAlign.center,
           ),
         ),
         body: Stack(
@@ -131,27 +140,41 @@ class _RoomAndDepaScreenState extends ConsumerState<RoomAndDepaScreen> {
                               itemCount: depaRestantState.depa?.length ?? 0,
                               itemBuilder: (context, index) {
                                 final depa = depaRestantState.depa?[index];
-                                return GestureDetector(
-                                  onTap: () async {
-                                    if (depa != null) {
-                                      final result =
-                                          await showDialog<DepaRestantModel>(
-                                            context: context,
-                                            builder: (context) {
-                                              return RoomStatusSelectionDialog(
-                                                depaRestantModel: depa,
-                                              );
-                                            },
-                                          );
-                                      if (result != null) {
-                                        ref
-                                            .read(depaRestantProvider.notifier)
-                                            .updateDepa(result, index);
-                                      }
+                                final bgColor =
+                                    switch (RoomStatus.getRoomStatus(
+                                      depa?.status ?? 0,
+                                    )) {
+                                      RoomStatus.DEFAULT =>
+                                        MColors().mediumDarkGray,
+                                      RoomStatus.CLEANED =>
+                                        MColors().freshGreen,
+                                      RoomStatus.REDCARCD =>
+                                        MColors().crimsonRed,
+                                      RoomStatus.VOLUNTER =>
+                                        MColors().chartreuse,
+                                    };
+                                return roomItem(depa, bgColor, () async {
+                                  HapticFeedback.heavyImpact();
+                                  await Future.delayed(
+                                    Duration(milliseconds: 150),
+                                  );
+                                  if (depa != null) {
+                                    final result =
+                                        await showDialog<DepaRestantModel>(
+                                          context: context,
+                                          builder: (context) {
+                                            return RoomStatusSelectionDialog(
+                                              depaRestantModel: depa,
+                                            );
+                                          },
+                                        );
+                                    if (result != null) {
+                                      ref
+                                          .read(depaRestantProvider.notifier)
+                                          .updateDepa(result, index);
                                     }
-                                  },
-                                  child: roomItem(depa),
-                                );
+                                  }
+                                });
                               },
                             ),
                           ),
@@ -205,27 +228,41 @@ class _RoomAndDepaScreenState extends ConsumerState<RoomAndDepaScreen> {
                               itemBuilder: (context, index) {
                                 final restant =
                                     depaRestantState.restant?[index];
-                                return GestureDetector(
-                                  onTap: () async {
-                                    if (restant != null) {
-                                      final result =
-                                          await showDialog<DepaRestantModel>(
-                                            context: context,
-                                            builder: (context) {
-                                              return RoomStatusSelectionDialog(
-                                                depaRestantModel: restant,
-                                              );
-                                            },
-                                          );
-                                      if (result != null) {
-                                        ref
-                                            .read(depaRestantProvider.notifier)
-                                            .updateRestant(result, index);
-                                      }
+                                final bgColor =
+                                    switch (RoomStatus.getRoomStatus(
+                                      restant?.status ?? 0,
+                                    )) {
+                                      RoomStatus.DEFAULT =>
+                                        MColors().mediumDarkGray,
+                                      RoomStatus.CLEANED =>
+                                        MColors().freshGreen,
+                                      RoomStatus.REDCARCD =>
+                                        MColors().crimsonRed,
+                                      RoomStatus.VOLUNTER =>
+                                        MColors().chartreuse,
+                                    };
+                                return roomItem(restant, bgColor, () async {
+                                  HapticFeedback.heavyImpact();
+                                  await Future.delayed(
+                                    Duration(milliseconds: 150),
+                                  );
+                                  if (restant != null) {
+                                    final result =
+                                        await showDialog<DepaRestantModel>(
+                                          context: context,
+                                          builder: (context) {
+                                            return RoomStatusSelectionDialog(
+                                              depaRestantModel: restant,
+                                            );
+                                          },
+                                        );
+                                    if (result != null) {
+                                      ref
+                                          .read(depaRestantProvider.notifier)
+                                          .updateRestant(result, index);
                                     }
-                                  },
-                                  child: roomItem(restant),
-                                );
+                                  }
+                                });
                               },
                             ),
                           ),
@@ -243,25 +280,36 @@ class _RoomAndDepaScreenState extends ConsumerState<RoomAndDepaScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
                         Expanded(
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: MColors().chartreuse,
-                            ),
-                            onPressed: () {
+                          child: InkWell(
+                            onTap: () {
+                              HapticFeedback.heavyImpact();
                               ref
                                   .read(depaRestantProvider.notifier)
                                   .getDepasAndRestant(widget.employee.id ?? -1);
                             },
                             child: Padding(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 10.r,
-                                vertical: 20.r,
-                              ),
-                              child: Text(
-                                "reset".tr(),
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 15.sp,
+                              padding: EdgeInsets.symmetric(vertical: 10.r),
+
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: MColors().chartreuse,
+                                  borderRadius: BorderRadius.circular(30.r),
+                                ),
+                                padding: EdgeInsets.symmetric(vertical: 10.r),
+
+                                child: Center(
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+
+                                    child: Text(
+                                      "reset".tr(),
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 15.sp,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -269,24 +317,34 @@ class _RoomAndDepaScreenState extends ConsumerState<RoomAndDepaScreen> {
                         ),
                         20.horizontalSpace,
                         Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
+                          child: InkWell(
+                            onTap: () {
+                              HapticFeedback.heavyImpact();
                               showConfirmationDialog();
                             },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: MColors().freshGreen,
-                            ),
 
                             child: Padding(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 10.r,
-                                vertical: 20.r,
-                              ),
-                              child: Text(
-                                "submit_button".tr(),
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16.sp,
+                              padding: EdgeInsets.symmetric(vertical: 10.r),
+
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: MColors().freshGreen,
+                                  borderRadius: BorderRadius.circular(30.r),
+                                ),
+                                padding: EdgeInsets.symmetric(vertical: 10.r),
+
+                                child: Center(
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      "submit_button".tr(),
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16.sp,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -304,10 +362,10 @@ class _RoomAndDepaScreenState extends ConsumerState<RoomAndDepaScreen> {
                 height: double.infinity,
                 color: Colors.black38,
                 child: Center(
-                  child: SpinKitCubeGrid(
-                    color: Colors.red,
+                  child: SpinKitFadingCube(
+                    color: MColors().crimsonRed,
                     size: 100.0.r,
-                    duration: Duration(milliseconds: 800),
+                    duration: Duration(milliseconds: 1000),
                   ),
                 ),
               ),

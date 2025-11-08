@@ -26,7 +26,7 @@ class RestantRecord {
     final Map<String, dynamic> data = <String, dynamic>{};
     data['room_id'] = roomId;
     data['extra'] = extra;
-    if (volunteer != -1) {
+    if (volunteer!=null &&volunteer != -1) {
       data['volunteer'] = volunteer;
     }
     data['status'] = status;

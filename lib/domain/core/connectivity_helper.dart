@@ -21,18 +21,22 @@ class ConnectivityHelper {
   // Subscription for internet status
   StreamSubscription<InternetConnectionStatus>? _internetSubscription;
 
+  // Debounce timer to prevent rapid status changes
+  Timer? _debounceTimer;
+  static const Duration _debounceDelay = Duration(seconds: 2);
+
   /// Initialize the helper
   Future<void> initialize() async {
     try {
       // Get initial status immediately
       final initialStatus = await InternetConnectionChecker.instance.connectionStatus;
       _updateStatus(initialStatus);
-      
+
       // Listen for internet status changes
       _internetSubscription = InternetConnectionChecker.instance
           .onStatusChange
           .listen((InternetConnectionStatus status) {
-        _updateStatus(status);
+        _debouncedUpdateStatus(status);
       });
     } catch (e) {
       print('ConnectivityHelper initialization error: $e');
@@ -41,6 +45,16 @@ class ConnectivityHelper {
     }
   }
 
+  /// Debounced status update to prevent rapid changes
+  void _debouncedUpdateStatus(InternetConnectionStatus status) {
+    // Cancel previous timer if it exists
+    _debounceTimer?.cancel();
+
+    // Set new timer
+    _debounceTimer = Timer(_debounceDelay, () {
+      _updateStatus(status);
+    });
+  }
 
   /// Update status based on internet checker
   void _updateStatus(InternetConnectionStatus status) {
@@ -49,6 +63,7 @@ class ConnectivityHelper {
         : ConnectivityStatus.offline;
 
     if (newStatus != _currentStatus) {
+      print('🔄 Connectivity status changed: ${_currentStatus} → $newStatus');
       _currentStatus = newStatus;
       _controller.add(newStatus);
     }
@@ -59,6 +74,7 @@ class ConnectivityHelper {
 
   /// Dispose of subscriptions
   void dispose() {
+    _debounceTimer?.cancel();
     _internetSubscription?.cancel();
     _controller.close();
   }

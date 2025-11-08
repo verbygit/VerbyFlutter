@@ -15,6 +15,7 @@ import 'package:pointycastle/macs/hmac.dart';
 import 'package:pointycastle/digests/sha256.dart';
 import 'package:verby_flutter/data/models/remote/record/CreateRecordRequest.dart';
 import 'package:verby_flutter/utils/storage_permission_helper.dart';
+import 'package:verby_flutter/data/service/icloud_documents_service.dart';
 
 class BackupService {
   static const String _backupPassword =
@@ -171,26 +172,44 @@ class BackupService {
     }
   }
 
-  // iOS: Save using UIDocumentPicker via file_picker
+  // iOS: Save to iCloud Documents ONLY (no fallback)
   Future<bool> _saveToIOS(Uint8List zipData) async {
     try {
-      // Use file_picker to let user choose save location
-      final result = await FilePicker.platform.saveFile(
-        dialogTitle: 'Save Backup File',
-        fileName: _backupFileName,
-        bytes: zipData,
-        allowedExtensions: ['zip'],
-      );
+      // Check if iCloud is available
+      final isICloudAvailable =
+          await ICloudDocumentsService.isICloudAvailable();
+      if (!isICloudAvailable) {
+        print('iCloud not available - backup failed');
+        return false;
+      }
 
-      if (result != null) {
-        print('Backup saved to $result');
+      // Save to iCloud Documents
+      final success = await ICloudDocumentsService.saveToICloud(zipData);
+      if (success) {
+        print('Backup saved to iCloud Documents');
+
+        // Debug: Check sync status after save
+        final syncStatus = await ICloudDocumentsService.checkICloudSyncStatus();
+        if (syncStatus != null) {
+          print('🔍 [DEBUG] iCloud Sync Status:');
+          print('  Container Available: ${syncStatus['containerAvailable']}');
+          print('  File Exists: ${syncStatus['fileExists']}');
+          print('  File Size: ${syncStatus['fileSize']} bytes');
+          print('  Is Ubiquitous Item: ${syncStatus['isUbiquitousItem']}');
+          print('  Download Status: ${syncStatus['downloadStatus']}');
+          print(
+            '  Has Unresolved Conflicts: ${syncStatus['hasUnresolvedConflicts']}',
+          );
+          print('  File Path: ${syncStatus['filePath']}');
+        }
+
         return true;
       } else {
-        print('User cancelled file picker');
+        print('Failed to save to iCloud - backup failed');
         return false;
       }
     } catch (e) {
-      print('Error saving to iOS: $e');
+      print('Error saving to iCloud: $e');
       return false;
     }
   }
@@ -198,24 +217,28 @@ class BackupService {
   // Upload/Import functionality
   Future<List<CreateRecordRequest>?> uploadAndExtractRecords() async {
     try {
-      // Pick ZIP file based on platform
-      String? filePath;
       if (Platform.isAndroid) {
-        filePath = await _pickFileFromAndroid();
+        // Android: Use file picker
+        final filePath = await _pickFileFromAndroid();
+        if (filePath == null) {
+          print('No file selected');
+          return null;
+        }
+        return await _extractRecordsFromZip(filePath);
       } else if (Platform.isIOS) {
-        filePath = await _pickFileFromIOS();
+        // iOS: Use file picker to select from iCloud Drive
+        final filePath = await _pickFileFromIOS();
+        if (filePath != null) {
+          print('Loading selected file from iCloud Drive: $filePath');
+          return await _extractRecordsFromZip(filePath);
+        } else {
+          print('No file selected from iCloud Drive');
+          return null;
+        }
       } else {
         print('Unsupported platform');
         return null;
       }
-
-      if (filePath == null) {
-        print('No file selected');
-        return null;
-      }
-
-      // Extract and parse records from ZIP
-      return await _extractRecordsFromZip(filePath);
     } catch (e) {
       print('Error in uploadAndExtractRecords: $e');
       return null;
@@ -272,14 +295,16 @@ class BackupService {
     }
   }
 
-  // iOS: Pick ZIP file from Downloads folder
+  // iOS: Pick ZIP file from iCloud Drive or local storage
   Future<String?> _pickFileFromIOS() async {
     try {
-      // Use file_picker to select ZIP file
+      // Use file_picker to select ZIP file from iCloud Drive or local storage
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['zip'],
         allowMultiple: false,
+        // This will show the Files app where users can navigate to iCloud Drive
+        // and select files from the Verby folder or any other location
       );
 
       if (result != null && result.files.isNotEmpty) {
@@ -288,7 +313,7 @@ class BackupService {
           // Verify it's a ZIP file
           if (file.extension?.toLowerCase() == 'zip') {
             print(
-              'iOS: File selected from Files app, copied to temp location: ${file.path}',
+              'iOS: File selected from Files app (iCloud Drive or local), copied to temp location: ${file.path}',
             );
             print(
               'Note: Original file in Files app will remain (iOS limitation)',
@@ -305,6 +330,65 @@ class BackupService {
       return null;
     } catch (e) {
       print('Error picking file from iOS: $e');
+      return null;
+    }
+  }
+
+  // Extract and parse records from ZIP data (for iCloud)
+  Future<List<CreateRecordRequest>?> _extractRecordsFromData(
+    Uint8List zipData,
+  ) async {
+    try {
+      // Create temp directory for extraction
+      final tempDir = await getTemporaryDirectory();
+      final extractDir = Directory(
+        path.join(
+          tempDir.path,
+          'extracted_${DateTime.now().millisecondsSinceEpoch}',
+        ),
+      );
+
+      if (!await extractDir.exists()) {
+        await extractDir.create(recursive: true);
+      }
+
+      // Write ZIP data to temp file
+      final zipFilePath = path.join(tempDir.path, 'temp_backup.zip');
+      final zipFile = File(zipFilePath);
+      await zipFile.writeAsBytes(zipData);
+
+      // Extract ZIP file
+      await ZipFile.extractToDirectory(
+        zipFile: zipFile,
+        destinationDir: extractDir,
+      );
+
+      // Look for JSON file in extracted contents
+      final jsonFile = await _findJsonFile(extractDir);
+      if (jsonFile == null) {
+        print('No JSON file found in ZIP archive');
+        // Clean up temp directory on error
+        await extractDir.delete(recursive: true);
+        await zipFile.delete();
+        return null;
+      }
+
+      // Read and parse JSON
+      final jsonString = await jsonFile.readAsString();
+      final List<dynamic> jsonList = jsonDecode(jsonString);
+
+      // Convert to CreateRecordRequest objects
+      final List<CreateRecordRequest> records = jsonList
+          .map((json) => CreateRecordRequest.fromJson(json))
+          .toList();
+
+      // Clean up temp directory
+      await extractDir.delete(recursive: true);
+      await zipFile.delete();
+
+      return records;
+    } catch (e) {
+      print('Error extracting records from data: $e');
       return null;
     }
   }
@@ -418,27 +502,60 @@ class BackupService {
     }
   }
 
-  // Delete original file from Android Documents directory
-  Future<Either<String, bool>> deleteOriginalAndroidFile() async {
+  Future<Either<String, bool>> deleteBackupFile() async {
     try {
-      // Construct the path to the original file in Documents directory
-      final documentsDir = Directory('/storage/emulated/0/Documents');
-      final originalFilePath = path.join(documentsDir.path, _backupFileName);
-      final originalFile = File(originalFilePath);
-
-      // Check if the original file exists
-      if (await originalFile.exists()) {
-        await originalFile.delete();
-        print('Original Android file deleted successfully: $originalFilePath');
+      bool result = false;
+      if (Platform.isIOS) {
+        result = await deleteICloudBackupFile();
+      } else {
+        result = await deleteOriginalAndroidFile();
+      }
+      if (result) {
         return Right(true);
       } else {
-        print('Original Android file not found: $originalFilePath');
-        return Left('Original Android file not found');
+        return Left('Failed to delete backup file');
       }
     } catch (e) {
-      print('Warning: Could not delete original Android file: $e');
-      return Left('Could not delete original Android file');
-      // Don't fail the operation if original file deletion fails
+      return Left('Error deleting backup file: $e');
+    }
+  }
+
+  // Delete original file from Android Documents directory
+  Future<bool> deleteOriginalAndroidFile() async {
+    final documentsDir = Directory('/storage/emulated/0/Documents');
+    final originalFilePath = path.join(documentsDir.path, _backupFileName);
+    final originalFile = File(originalFilePath);
+
+    // Check if the original file exists
+    if (await originalFile.exists()) {
+      await originalFile.delete();
+      print('Original Android file deleted successfully: $originalFilePath');
+      return true;
+    } else {
+      print('Original Android file not found: $originalFilePath');
+      return false;
+    }
+  }
+
+  /// Delete iCloud backup file
+  Future<bool> deleteICloudBackupFile() async {
+    try {
+      if (Platform.isIOS) {
+        final success = await ICloudDocumentsService.deleteICloudFile();
+        if (success) {
+          print('✅ iCloud backup file deleted successfully');
+          return true;
+        } else {
+          print('❌ Failed to delete iCloud backup file');
+          return false;
+        }
+      } else {
+        print('Delete iCloud file only available on iOS');
+        return false;
+      }
+    } catch (e) {
+      print('Error deleting iCloud backup file: $e');
+      return false;
     }
   }
 }

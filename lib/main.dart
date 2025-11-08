@@ -10,7 +10,9 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:verby_flutter/domain/core/connectivity_helper.dart';
+import 'package:verby_flutter/presentation/screens/checklist/room_list_screen.dart';
 import 'package:verby_flutter/presentation/screens/worker_screen.dart';
+import 'package:verby_flutter/data/service/lock_task_service.dart';
 
 import 'firebase_options.dart';
 
@@ -27,6 +29,9 @@ void main() async {
   ]);
 
   ConnectivityHelper().initialize();
+  
+  // Initialize lock task service
+  await LockTaskService().initialize();
 
   // Capture Flutter errors
   FlutterError.onError = (errorDetails) {

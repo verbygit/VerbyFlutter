@@ -9,7 +9,9 @@
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     
-    <!-- Note: No media permissions needed - app only accesses ZIP files, not photos/videos -->
+    <!-- Image picker permissions -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     
     <!-- Legacy storage permissions for older Android versions -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" 

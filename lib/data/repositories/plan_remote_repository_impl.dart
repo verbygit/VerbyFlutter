@@ -12,12 +12,16 @@ class PlanRemoteRepositoryImpl extends PlanRemoteRepository {
   PlanRemoteRepositoryImpl(this.apiClient);
 
   @override
-  Future<Either<Failure, String>> getPlan(String deviceID, int employeeId) {
+  Future<Either<Failure, List<String>>> getPlan(String deviceID, int employeeId) {
     return apiClient.get(
       ApiConstant.plan(deviceID),
       queryParameters: {"employee": employeeId, "date": _getCurrentDate()},
-      fromJson: (data) => data.toString(),
-    );
+      fromJson: (data) {
+        if (data is List) {
+          return data.map((e) => e.toString()).toList();
+        }
+        throw Exception("Expected List but got ${data.runtimeType}");
+      },    );
   }
 
   String _getCurrentDate() {

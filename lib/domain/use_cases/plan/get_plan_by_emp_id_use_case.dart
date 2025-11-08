@@ -13,7 +13,7 @@ class GetPlanByEmpIdUseCase {
 
   GetPlanByEmpIdUseCase(this.repository);
 
-  Future<Either<String, Plan?>> call(String id) async {
+  Future<Either<String, Plan>> call(String id) async {
     return await repository.getPlanByEmployeeId(id);
   }
 }

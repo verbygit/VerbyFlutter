@@ -26,6 +26,7 @@ class _IdentificationDialogState extends ConsumerState<IdentificationDialog> {
   FocusNode? _focusNode;
 
   Future<void> _checkEmployeeID() async {
+    HapticFeedback.heavyImpact();
     if (_idController.text.isEmpty) {
       ref
           .read(identificationDialogProvider.notifier)
@@ -114,8 +115,8 @@ class _IdentificationDialogState extends ConsumerState<IdentificationDialog> {
             ),
             40.verticalSpace,
 
-            if (identificationState.error?.isNotEmpty == true)
-              ErrorBox(identificationState.error ?? ""),
+            // if (identificationState.error?.isNotEmpty == true)
+            //   ErrorBox(identificationState.error ?? ""),
             20.verticalSpace,
 
             Container(

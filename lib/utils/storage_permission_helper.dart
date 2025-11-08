@@ -1,5 +1,6 @@
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'dart:io';
 
 class StoragePermissionHelper {
@@ -93,12 +94,12 @@ class StoragePermissionHelper {
     
     switch (permissionType) {
       case 'Storage':
-        title = 'Storage Permission Required';
-        message = 'Storage access is required for backup and restore functionality. Please enable storage permission in app settings.';
+        title = 'storage_permission_required'.tr();
+        message = 'storage_permission_message'.tr();
         break;
       default:
-        title = 'Permission Required';
-        message = 'This permission is required for the app to function properly. Please enable it in app settings.';
+        title = 'permission_required'.tr();
+        message = 'permission_required_message'.tr();
     }
     
     showDialog(
@@ -110,14 +111,14 @@ class StoragePermissionHelper {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
+              child: Text('cancel'.tr()),
             ),
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
                 openAppSettings();
               },
-              child: const Text('Open Settings'),
+              child: Text('open_settings'.tr()),
             ),
           ],
         );

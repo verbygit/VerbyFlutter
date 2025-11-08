@@ -80,7 +80,7 @@ class DepaRestantDao {
   Future<bool> deleteDepaRestants(List<String> roomId) async {
     if (roomId.isEmpty) {
       if (kDebugMode) {
-        print("⚠️ No employee IDs provided for deletion.");
+        print("⚠️ No  IDs provided for deletion.");
       }
       return true;
     }
@@ -102,6 +102,34 @@ class DepaRestantDao {
     } catch (e) {
       if (kDebugMode) {
         print("❌ Error deleting emp action states: $e");
+      }
+      return false;
+    }
+  }
+
+  Future<bool> deleteDepaRestantsByEmployeeId(String employeeId) async {
+    if (employeeId.isEmpty) {
+      if (kDebugMode) {
+        print("⚠️ No  IDs provided for deletion.");
+      }
+      return true;
+    }
+
+    try {
+      final db = await _databaseHelper.database;
+      final int deletedRows = await db?.delete(
+        DatabaseHelper.TABLE_DEPA_RESTANT,
+        where: 'employeeId = ?',
+        whereArgs: [employeeId],
+      ) ?? 0;
+
+      if (kDebugMode) {
+        print("✅ Deleted $deletedRows depa restant records for employee: $employeeId");
+      }
+      return true;
+    } catch (e) {
+      if (kDebugMode) {
+        print("❌ Error deleting depa restant records for employee $employeeId: $e");
       }
       return false;
     }

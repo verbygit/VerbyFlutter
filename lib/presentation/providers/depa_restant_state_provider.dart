@@ -33,7 +33,7 @@ class DepaRestantStateNotifier extends StateNotifier<DepaRestantScreenState> {
     await depaResult.fold(
       (onError) async => state = state.copyWith(error: onError),
       (onData) async =>
-          state = state.copyWith(depa: [...?state.depa, ...?onData]),
+          state = state.copyWith(depa: onData),
     );
     final restantResult = await _getDepaRestantByEmpId.call(employeeId, false);
     await restantResult.fold(
@@ -41,7 +41,7 @@ class DepaRestantStateNotifier extends StateNotifier<DepaRestantScreenState> {
           state = state.copyWith(isLoading: false, error: onError),
       (onData) async => state = state.copyWith(
         isLoading: false,
-        restant: [...?state.restant, ...?onData],
+        restant: onData,
       ),
     );
   }
@@ -59,7 +59,7 @@ class DepaRestantStateNotifier extends StateNotifier<DepaRestantScreenState> {
 
     await result.fold(
       (onError) async {
-        state.copyWith(error: onError.message);
+        state.copyWith(isLoading:false ,error: onError.message);
       },
       (onData) {
         final depaList = onData.depa
@@ -90,6 +90,7 @@ class DepaRestantStateNotifier extends StateNotifier<DepaRestantScreenState> {
       await _insertDepaRestantsUseCase.call(depaRestants);
       setDepasAndRestant(employeeId.toString());
     }
+    state = state.copyWith(isLoading: false);
   }
 
 

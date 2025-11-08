@@ -2,8 +2,10 @@ import 'dart:io';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:verby_flutter/presentation/theme/colors.dart';
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
@@ -45,7 +47,7 @@ class _FaceRegistrationScreenState
   final FaceRecognition _faceRecognition = FaceRecognition();
   bool _isProcessing = false;
   List<({Range x, Range y, Range z})> _faceOrientationPoints = [];
-  String _status = 'Center your face';
+  String _status = 'center_your_face'.tr();
   double _progress = 0.0;
   bool _isFaceOrientationCentered = false;
 
@@ -54,7 +56,6 @@ class _FaceRegistrationScreenState
     super.initState();
     _initFaceDetector();
     _initializeControllerFuture = _initCamera();
-    _checkModelLoading();
   }
   
   Future<void> _checkModelLoading() async {
@@ -64,7 +65,7 @@ class _FaceRegistrationScreenState
     if (!modelLoaded) {
       if (mounted) {
         setState(() {
-          _status = 'TensorFlow model failed to load. Tap to retry.';
+          _status = 'tensorflow_model_failed'.tr();
         });
         
         // Log model loading failure to Crashlytics
@@ -86,7 +87,7 @@ class _FaceRegistrationScreenState
       // TensorFlow model loaded successfully
       if (mounted) {
         setState(() {
-          _status = 'Camera ready. Center your face.';
+          _status = 'camera_ready_center_face'.tr();
         });
         
         // Log successful model loading
@@ -108,18 +109,18 @@ class _FaceRegistrationScreenState
   
   Future<void> _retryModelLoading() async {
     setState(() {
-      _status = 'Retrying model loading...';
+      _status = 'retrying_model_loading'.tr();
     });
     
     final success = await _faceRecognition.retryModelLoading();
     
     if (success) {
       setState(() {
-        _status = 'Model loaded successfully! Center your face.';
+        _status = 'model_loaded_successfully'.tr();
       });
     } else {
       setState(() {
-        _status = 'Model loading failed. Please restart the app.';
+        _status = 'model_loading_failed'.tr();
       });
     }
   }
@@ -139,11 +140,11 @@ class _FaceRegistrationScreenState
 
   Future<void> _initCamera() async {
     try {
-      // Request camera and audio permissions first
-      final hasPermission = await CameraPermissionHelper.requestCameraAndAudioPermissions(context);
+      // Request camera permission only
+      final hasPermission = await CameraPermissionHelper.requestCameraPermissionOnly(context);
       if (!hasPermission) {
         setState(() {
-          _status = 'Camera or microphone permission denied. Please enable both permissions in settings.';
+          _status = 'camera_permission_denied_only'.tr();
         });
         return;
       }
@@ -151,7 +152,7 @@ class _FaceRegistrationScreenState
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
         setState(() {
-          _status = 'No cameras available on this device.';
+          _status = 'no_cameras_available'.tr();
         });
         return;
       }
@@ -161,7 +162,7 @@ class _FaceRegistrationScreenState
         orElse: () => cameras.first, // Fallback to any camera if front camera not available
       );
       
-      _controller = CameraController(frontCamera, ResolutionPreset.medium);
+      _controller = CameraController(frontCamera, ResolutionPreset.low,enableAudio: false);
       await _controller!.initialize();
       
       // Add a small delay before starting image stream to prevent iOS crashes
@@ -173,13 +174,12 @@ class _FaceRegistrationScreenState
         
         // Initialize orientation points after camera is ready
         _initOrientationPoints();
-      
-      setState(() {
-        _status = 'Camera initialized successfully. Center your face.';
-      });
+        
+        // Check model loading only after camera permission is granted
+        _checkModelLoading();
       } else {
         setState(() {
-          _status = 'Camera controller failed to initialize properly.';
+          _status = 'camera_controller_failed'.tr();
         });
       }
     } catch (e) {
@@ -198,7 +198,7 @@ class _FaceRegistrationScreenState
       );
       
       setState(() {
-        _status = 'Failed to initialize camera: ${e.toString()}';
+        _status = 'failed_to_initialize_camera'.tr() + ' ${e.toString()}';
       });
       if (kDebugMode) {
         // Camera initialization error logged to Crashlytics
@@ -271,11 +271,9 @@ class _FaceRegistrationScreenState
       final faces = await _faceDetector!.processImage(inputImage);
 
       if (faces.isEmpty) {
-        _updateStatus('No face detected - please look at camera');
+        _updateStatus('no_face_detected'.tr());
       } else if (faces.length > 1) {
-        _updateStatus(
-          'Multiple faces detected - please ensure only one person is in frame',
-        );
+        _updateStatus('multiple_faces_detected'.tr());
       } else {
         final face = faces.first;
         final boundingBox = face.boundingBox;
@@ -316,7 +314,7 @@ class _FaceRegistrationScreenState
         }
         
         if (width < minPixelSize || height < minPixelSize || (cameraResolution != null && faceSizeRatio < minFaceSizeRatio)) {
-          _updateStatus('Move closer to camera - face too small');
+          _updateStatus('move_closer'.tr());
         } else {
           final orientation = [
             face.headEulerAngleX ?? 0.0,
@@ -326,12 +324,12 @@ class _FaceRegistrationScreenState
 
           bool start = _checkIfFaceIsCentered(face);
           if (start) {
-            _updateStatus('Face centered! Capturing...');
+            _updateStatus('face_centered_capturing'.tr());
             final croppedFace = await _cropFace(image, face);
             if (croppedFace != null) {
               // Check if TensorFlow model is loaded before processing
               if (!_faceRecognition.isModelLoaded()) {
-                _updateStatus('TensorFlow model not loaded. Please restart the app.');
+                _updateStatus('tensorflow_model_not_loaded'.tr());
                 
                 // Log model not loaded error to Crashlytics
                 FirebaseCrashlytics.instance.recordError(
@@ -356,9 +354,9 @@ class _FaceRegistrationScreenState
               );
 
               if (success) {
-                _updateStatus('Face registration successful!');
+                _updateStatus('face_registration_successful'.tr());
                 await Future.delayed(Duration(seconds: 1));
-                _updateStatus('Saving to database...');
+                _updateStatus('saving_to_database'.tr());
                 
                 // Save face to database
                 await _saveFaceToDatabase(croppedFace);
@@ -383,7 +381,7 @@ class _FaceRegistrationScreenState
                   ],
                 );
                 
-                _updateStatus('Failed to process face - please try again');
+                _updateStatus('failed_to_process_face_retry'.tr());
               }
             } else {
               // Log face cropping failure to Crashlytics
@@ -402,7 +400,7 @@ class _FaceRegistrationScreenState
                 ],
               );
               
-              _updateStatus('Failed to crop face - please try again');
+              _updateStatus('failed_to_crop_face'.tr());
             }
           }
         }
@@ -426,7 +424,7 @@ class _FaceRegistrationScreenState
       
       if (mounted) {
         setState(() {
-          _status = 'Error processing image. Please try again.';
+          _status = 'error_processing_image'.tr();
         });
       }
     }
@@ -498,17 +496,17 @@ class _FaceRegistrationScreenState
       
       if (!isPositionCentered) {
         if (deltaX > thresholdX) {
-          _updateStatus(faceCenterX < frameCenterX ? 'Move face right' : 'Move face left');
+          _updateStatus(faceCenterX < frameCenterX ? 'move_face_right'.tr() : 'move_face_left'.tr());
         } else {
-          _updateStatus(faceCenterY < frameCenterY ? 'Move face down' : 'Move face up');
+          _updateStatus(faceCenterY < frameCenterY ? 'move_face_down'.tr() : 'move_face_up'.tr());
         }
       } else if (!isOrientationCentered) {
         if (!_faceOrientationPoints.first.x.contains(orientation[0])) {
-          _updateStatus(orientation[0] < _faceOrientationPoints.first.x.start ? 'Move face down' : 'Move face up');
+          _updateStatus(orientation[0] < _faceOrientationPoints.first.x.start ? 'move_face_down'.tr() : 'move_face_up'.tr());
         } else if (!_faceOrientationPoints.first.y.contains(orientation[1])) {
-          _updateStatus(orientation[1] < _faceOrientationPoints.first.y.start ? 'Turn head right' : 'Turn head left');
+          _updateStatus(orientation[1] < _faceOrientationPoints.first.y.start ? 'turn_head_right'.tr() : 'turn_head_left'.tr());
         } else {
-        _updateStatus('Adjust head tilt');
+        _updateStatus('adjust_head_tilt'.tr());
         }
       }
       
@@ -553,7 +551,7 @@ class _FaceRegistrationScreenState
         // Create FaceModel
         final faceModel = FaceModel(
           employeeId: widget.employee.id.toString(),
-          employeeName: widget.employee.name ?? 'Unknown',
+          employeeName: widget.employee.name ?? 'unknown'.tr(),
           faceEmbedding: lastRegisteredFace.embedding,
           registeredAt: DateTime.now(),
           lastUsedAt: DateTime.now(),
@@ -572,23 +570,21 @@ class _FaceRegistrationScreenState
         
         result.fold(
           (error) {
-            _updateStatus('Database save failed: $error');
+            _updateStatus('database_save_failed'.tr() + ' $error');
           },
           (_) {
-            _updateStatus('Face saved to database!');
+            _updateStatus('face_saved_to_database'.tr());
           },
         );
       } else {
-        _updateStatus('No face data to save');
+        _updateStatus('no_face_data_to_save'.tr());
       }
     } catch (e) {
-      _updateStatus('Error saving to database: $e');
+      _updateStatus('error_saving_to_database'.tr() + ' $e');
     }
   }
 
-  void _setFaceState(bool state) {
-    // Update UI background or indicator for face detected
-  }
+
 
   InputImage _convertCameraImageToInputImage(CameraImage image) {
     try {
@@ -793,7 +789,18 @@ class _FaceRegistrationScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: MColors().darkGrey,
+        automaticallyImplyLeading: false,
+        leading: IconButton(
+          onPressed: () {
+            HapticFeedback.heavyImpact();
+            Navigator.pop(context);
+          },
+          icon: Icon(Icons.arrow_back_ios, color: Colors.white),
+        ),
 
+      ),
       body: FutureBuilder<void>(
         future: _initializeControllerFuture,
         builder: (context, snapshot) {
@@ -839,14 +846,14 @@ class _FaceRegistrationScreenState
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(0, 0, 0, 40.h),
                     child: GestureDetector(
-                      onTap: _status.contains('Tap to retry') ? _retryModelLoading : null,
+                      onTap: _status.contains('tensorflow_model_failed'.tr()) ? _retryModelLoading : null,
                       child: Text(
                         _status,
                         style: TextStyle(
                           fontSize: 20.sp,
                           fontWeight: FontWeight.bold,
-                          color: _status.contains('Tap to retry') ? Colors.blue : Colors.black,
-                          decoration: _status.contains('Tap to retry') ? TextDecoration.underline : null,
+                          color: _status.contains('tensorflow_model_failed'.tr()) ? Colors.blue : Colors.black,
+                          decoration: _status.contains('tensorflow_model_failed'.tr()) ? TextDecoration.underline : null,
                         ),
                         textAlign: TextAlign.center,
                       ),

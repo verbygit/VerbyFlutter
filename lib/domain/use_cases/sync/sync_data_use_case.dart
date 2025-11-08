@@ -5,6 +5,8 @@ import 'package:verby_flutter/core/date_time_extension.dart';
 import 'package:verby_flutter/data/mappers/data_mappers.dart';
 import 'package:verby_flutter/data/models/remote/employee.dart';
 import 'package:verby_flutter/data/models/remote/user_model.dart';
+import 'package:verby_flutter/domain/use_cases/depa_restant/delete_depa_restants_by_emp_use_case.dart';
+import 'package:verby_flutter/domain/use_cases/employee/delete_performance_state_use_case.dart';
 import 'package:verby_flutter/domain/use_cases/employee/save_employees_locally.dart';
 import '../../../data/models/local/depa_restant_model.dart';
 import '../../../data/models/local/employee_action_state.dart';
@@ -17,6 +19,7 @@ import '../../core/failure.dart';
 import '../../entities/action.dart';
 import '../../entities/perform.dart';
 import '../../entities/room_status.dart';
+import '../depa_restant/delete_depa_restants_use_case.dart';
 import '../depa_restant/get_depas_restants_use_case.dart';
 import '../depa_restant/insert_depas_restants_use_case.dart';
 import '../employee/get_employee_use_case.dart';
@@ -38,6 +41,8 @@ class SyncDataUseCase {
   final GetEmployeeUseCase _getEmployeeUseCase;
   final SaveEmployeesLocally _saveEmployeesLocallyUserCase;
   final GetLocalEmployeeUseCase _getLocalEmployeeUseCase;
+  final DeletePerformanceStateUseCase _deletePerformanceStateUseCase;
+  final DeleteDepaRestantsByEmpUseCase _deleteDepaRestantsUseCase;
 
   SyncDataUseCase(
     this._getRecordFromServerUseCase,
@@ -50,6 +55,8 @@ class SyncDataUseCase {
     this._getEmployeeUseCase,
     this._saveEmployeesLocallyUserCase,
     this._getLocalEmployeeUseCase,
+    this._deletePerformanceStateUseCase,
+    this._deleteDepaRestantsUseCase,
   );
 
   Future<String> syncData(
@@ -118,12 +125,12 @@ class SyncDataUseCase {
 
   Future<String> getEmpActionAndPerformState(int empId) async {
     final resultRecords = await _getRecordFromServerUseCase.call(empId);
-
     return await resultRecords.fold(
       (onError) async {
         return onError.message;
       },
       (onData) async {
+        print("getEmpActionAndPerformState====>>>>>   ${onData.toJson()}");
         final lastRecords = onData.lastRecords;
         if (lastRecords != null && lastRecords.isNotEmpty) {
           final empActionState = createEmployeeActionState(onData);
@@ -135,6 +142,8 @@ class SyncDataUseCase {
               lastRecords.first,
             );
             await _insertEmpPerformStateUseCase.call([empPerformState]);
+          } else {
+            _deletePerformanceStateUseCase.call(empId.toString());
           }
         }
         return "";
@@ -153,6 +162,9 @@ class SyncDataUseCase {
         return onError.message;
       },
       (onData) async {
+        if (kDebugMode) {
+          print("getDepaRestantForEmp====>>>>>   ${onData.toJson()}");
+        }
         final depaList = onData.depa
             ?.map(
               (e) => e.toDepaRestantModel(
@@ -178,6 +190,8 @@ class SyncDataUseCase {
 
         if (depaRestants.isNotEmpty) {
           await _insertDepaRestantsUseCase.call(depaRestants);
+        } else {
+         await _deleteDepaRestantsUseCase.call(empId.toString());
         }
         return "";
       },
@@ -310,6 +324,8 @@ class SyncDataUseCase {
                 lastRecords.first,
               );
               performStates.add(empPerformState);
+            } else {
+              _deletePerformanceStateUseCase.call(employee.id.toString());
             }
           }
         },
@@ -321,28 +337,31 @@ class SyncDataUseCase {
         (onError) async {
           errors.add(onError.message);
         },
-        (onData) {
-          final depaList = onData.depa
-              ?.map(
-                (e) => e.toDepaRestantModel(
-                  empId.toString(),
-                  true,
-                  RoomStatus.CLEANED.getRoomStatusValue(),
-                ),
-              )
-              .toList();
-          final restantList = onData.restant
-              ?.map(
-                (e) => e.toDepaRestantModel(
-                  empId.toString(),
-                  false,
-                  RoomStatus.CLEANED.getRoomStatusValue(),
-                ),
-              )
-              .toList();
+        (onData)async {
+          await _deleteDepaRestantsUseCase.call(empId.toString());
 
-          if (depaList != null) depaRestants.addAll(depaList);
-          if (restantList != null) depaRestants.addAll(restantList);
+          final depaList = onData.depa
+                          ?.map(
+                            (e) => e.toDepaRestantModel(
+                              empId.toString(),
+                              true,
+                              RoomStatus.CLEANED.getRoomStatusValue(),
+                            ),
+                          )
+                          .toList();
+            final restantList = onData.restant
+                ?.map(
+                  (e) => e.toDepaRestantModel(
+                    empId.toString(),
+                    false,
+                    RoomStatus.CLEANED.getRoomStatusValue(),
+                  ),
+                )
+                .toList();
+
+            if (depaList != null) depaRestants.addAll(depaList);
+            if (restantList != null) depaRestants.addAll(restantList);
+
         },
       );
     }).toList();

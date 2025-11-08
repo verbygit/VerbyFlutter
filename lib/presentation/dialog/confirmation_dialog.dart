@@ -1,5 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
@@ -31,20 +32,29 @@ class ConfirmationDialog extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
+                    child: InkWell(
+                      onTap: ()async {
+                        HapticFeedback.heavyImpact();
+                        await Future.delayed(Duration(milliseconds: 200));
                         Navigator.pop(context, false);
                       },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.black,
-                      ),
                       child: Padding(
-                        padding: EdgeInsets.all(10.r),
-                        child: Text(
-                          "no".tr(),
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 15.sp,
+                        padding: EdgeInsets.symmetric(vertical: 10.r),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.black,
+                            borderRadius: BorderRadius.circular(30.r),
+                          ),
+                          padding: EdgeInsets.all(10.r),
+                          child: Center(
+                            child: Text(
+                              "no".tr(),
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 15.sp,
+                                fontWeight: FontWeight.w500
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -52,21 +62,30 @@ class ConfirmationDialog extends ConsumerWidget {
                   ),
                   10.horizontalSpace,
                   Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
+                    child: InkWell(
+                      onTap: () async{
+                        HapticFeedback.heavyImpact();
+                        await Future.delayed(Duration(milliseconds: 200));
                         Navigator.pop(context, true);
                       },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.black,
-                      ),
 
                       child: Padding(
-                        padding: EdgeInsets.all(10.r),
-                        child: Text(
-                          "yes".tr(),
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 15.sp,
+                        padding: EdgeInsets.symmetric(vertical: 10.r),
+                        child: Container(
+                          padding: EdgeInsets.all(10.r),
+                          decoration: BoxDecoration(
+                            color: Colors.black,
+                            borderRadius: BorderRadius.circular(30.r),
+                          ),
+                          child: Center(
+                            child: Text(
+                              "yes".tr(),
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 15.sp,
+                                fontWeight: FontWeight.w500
+                              ),
+                            ),
                           ),
                         ),
                       ),

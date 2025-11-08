@@ -24,7 +24,7 @@ class RecordDao {
       final db = await _databaseHelper.database;
       await db?.insert(
         DatabaseHelper.TABLE_RECORD,
-        localRecord.toJson(),
+        localRecord.toDatabaseJson(),
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
     } catch (e) {
@@ -42,7 +42,7 @@ class RecordDao {
       for (var record in localRecords) {
         batch.insert(
           DatabaseHelper.TABLE_RECORD,
-          record.toJson(),
+          record.toDatabaseJson(),
           conflictAlgorithm: ConflictAlgorithm.replace,
         );
       }

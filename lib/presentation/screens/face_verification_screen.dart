@@ -6,6 +6,7 @@ import 'package:circular_seek_bar/circular_seek_bar.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -22,6 +23,7 @@ import 'package:verby_flutter/utils/navigation/navigate.dart';
 import '../../data/service/face_recognition.dart';
 import '../../domain/entities/face/recognition.dart';
 import '../../utils/camera_permission_helper.dart';
+import '../theme/colors.dart';
 
 class Range {
   final double start;
@@ -62,15 +64,12 @@ class _FaceVerificationScreenState
   final int _maxFrames = 30; // Reduced from 60 to 30 for faster timeout
   int _numberOfFrames = 0;
   int _eyesClosedFrames = 0;
-  final int _closedThreshold = 1; // Reduced from 2 to 1 for faster verification
+  final int _closedThreshold = 1; // Keep at 1 for very lenient blink detection
   EyeState _currentEyeState = EyeState.none;
-  String _status = 'Loading registered face...';
-  int _retryCount = 0;
-  int _maxRetries = 6; // Reduced for testing
+  String _status = 'loading_registered_face'.tr();
   bool _isFaceOrientationCentered = false;
   bool isNavigatedForward = false;
   List<({Range x, Range y, Range z})> _faceOrientationPoints = [];
-  bool isRetryFinished = false;
 
   @override
   void initState() {
@@ -78,15 +77,6 @@ class _FaceVerificationScreenState
     _initFaceDetector();
     _initializeControllerFuture = _initCamera();
     _loadRegisteredFaces();
-    _setMaxTries();
-  }
-
-  void _setMaxTries() async {
-    final tries =await SharedPreferencesHelper(
-      await SharedPreferences.getInstance(),
-    ).getFaceTries();
-    _maxRetries = tries?.toInt()??6;
-    print("_maxRetries==================> $tries");
   }
 
   Future<void> _loadRegisteredFaces() async {
@@ -99,7 +89,7 @@ class _FaceVerificationScreenState
       result.fold(
         (error) {
           print('❌ Failed to load face from database: $error');
-          _updateStatus('Failed to load registered face');
+          _updateStatus('failed_to_load_face'.tr());
         },
         (faceModel) {
           if (faceModel != null) {
@@ -114,18 +104,18 @@ class _FaceVerificationScreenState
             print(
               '✅ Loaded registered face for employee: ${faceModel.employeeName}',
             );
-            _updateStatus('Registered face loaded - ready for verification');
+            _updateStatus('registered_face_loaded'.tr());
           } else {
             print(
               '❌ No registered face found for employee: ${widget.employee.id}',
             );
-            _updateStatus('No registered face found for this employee');
+            _updateStatus('no_registered_face'.tr());
           }
         },
       );
     } catch (e) {
       print('❌ Error loading registered faces: $e');
-      _updateStatus('Error loading registered face');
+      _updateStatus('error_loading_face'.tr());
     }
   }
 
@@ -221,15 +211,14 @@ class _FaceVerificationScreenState
 
   Future<void> _initCamera() async {
     try {
-      // Request camera and audio permissions first
+      // Request camera permission only
       final hasPermission =
-          await CameraPermissionHelper.requestCameraAndAudioPermissions(
+          await CameraPermissionHelper.requestCameraPermissionOnly(
             context,
           );
       if (!hasPermission) {
         setState(() {
-          _status =
-              'Camera or microphone permission denied. Please enable both permissions in settings.';
+          _status = 'camera_permission_denied_only'.tr();
         });
         return;
       }
@@ -237,7 +226,7 @@ class _FaceVerificationScreenState
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
         setState(() {
-          _status = 'No cameras available on this device.';
+          _status = 'no_cameras_available'.tr();
         });
         return;
       }
@@ -248,7 +237,7 @@ class _FaceVerificationScreenState
             .first, // Fallback to any camera if front camera not available
       );
 
-      _controller = CameraController(frontCamera, ResolutionPreset.medium);
+      _controller = CameraController(frontCamera, ResolutionPreset.low,enableAudio: false);
       await _controller!.initialize();
 
       // Add a small delay before starting image stream to prevent iOS crashes
@@ -262,17 +251,16 @@ class _FaceVerificationScreenState
         _initOrientationPoints();
 
         setState(() {
-          _status =
-              'Camera initialized successfully. Loading registered face...';
+          _status = 'camera_initialized_successfully_loading'.tr();
         });
       } else {
         setState(() {
-          _status = 'Camera controller failed to initialize properly.';
+          _status = 'camera_controller_failed'.tr();
         });
       }
     } catch (e) {
       setState(() {
-        _status = 'Failed to initialize camera: ${e.toString()}';
+        _status = 'failed_to_initialize_camera'.tr() + ' ${e.toString()}';
       });
       if (kDebugMode) {
         print('Camera initialization error: $e');
@@ -293,12 +281,10 @@ class _FaceVerificationScreenState
       if (faces.isEmpty) {
         // Only update status if face verification hasn't passed yet
         if (!_isFaceRecognized) {
-          _updateStatus('No face detected - please look at camera');
+          _updateStatus('no_face_detected'.tr());
         }
       } else if (faces.length > 1) {
-        _updateStatus(
-          'Multiple faces detected - please ensure only one person is in frame',
-        );
+        _updateStatus('multiple_faces_detected'.tr());
       } else {
         final face = faces.first;
         final boundingBox = face.boundingBox;
@@ -349,7 +335,7 @@ class _FaceVerificationScreenState
             (cameraResolution != null && faceSizeRatio < minFaceSizeRatio)) {
           // Only update status if face verification hasn't passed yet
           if (!_isFaceRecognized) {
-            _updateStatus('Move closer to camera - face too small');
+            _updateStatus('move_closer'.tr());
           }
           print(
             '📏 Face size check: ${width.toInt()}x${height.toInt()} (min: ${minPixelSize}px), ratio: ${(faceSizeRatio * 100).toStringAsFixed(1)}% (min: ${(minFaceSizeRatio * 100).toInt()}%)',
@@ -370,7 +356,7 @@ class _FaceVerificationScreenState
           if (isCentered) {
             // Only update status if face verification hasn't passed yet
             if (!_isFaceRecognized) {
-              _updateStatus('Face centered! Verifying...');
+              _updateStatus('face_centered_verifying'.tr());
             }
             final croppedFace = await _cropFace(image, face);
             if (croppedFace != null) {
@@ -382,63 +368,27 @@ class _FaceVerificationScreenState
                 print('🎯 Expected employee ID: ${widget.employee.id}');
                 _analyzeFace(face, recognition);
               } else {
-                // Face not recognized - increment retry count
-                _retryCount++;
-                print(
-                  '🔄 Face not recognized. Retry count: $_retryCount/$_maxRetries',
-                );
-
-                if (_retryCount >= _maxRetries) {
-                  print(
-                    '🚨 MAXIMUM RETRIES REACHED (face not recognized)! Setting isRetryFinished = true',
-                  );
-                  _updateStatus(
-                    'Maximum retries reached - verification failed',
-                  );
-                  setState(() {
-                    isRetryFinished = true;
-                  });
-                  print('🚨 isRetryFinished is now: $isRetryFinished');
-                  // Stop camera processing and preview
-                  _stopCameraProcessing();
-                } else {
-                  // Only update status if face verification hasn't passed yet
-                  if (!_isFaceRecognized) {
-                    _updateStatus(
-                      'Face not recognized - please ensure you are the registered person',
-                    );
-                  }
+                // Face not recognized - continue trying
+                print('🔄 Face not recognized. Continuing verification...');
+                
+                // Only update status if face verification hasn't passed yet
+                if (!_isFaceRecognized) {
+                  _updateStatus('face_not_recognized'.tr());
                 }
               }
             } else {
-              // Face cropping failed - increment retry count
-              _retryCount++;
-              print(
-                '🔄 Face cropping failed. Retry count: $_retryCount/$_maxRetries',
-              );
-
-              if (_retryCount >= _maxRetries) {
-                print(
-                  '🚨 MAXIMUM RETRIES REACHED (face cropping failed)! Setting isRetryFinished = true',
-                );
-                _updateStatus('Maximum retries reached - verification failed');
-                setState(() {
-                  isRetryFinished = true;
-                });
-                print('🚨 isRetryFinished is now: $isRetryFinished');
-                // Stop camera processing and preview
-                _stopCameraProcessing();
-              } else {
-                // Only update status if face verification hasn't passed yet
-                if (!_isFaceRecognized) {
-                  _updateStatus('Failed to process face - please try again');
-                }
+              // Face cropping failed - continue trying
+              print('🔄 Face cropping failed. Continuing verification...');
+              
+              // Only update status if face verification hasn't passed yet
+              if (!_isFaceRecognized) {
+                _updateStatus('failed_to_process_face'.tr());
               }
             }
           } else {
             // Only update status if face verification hasn't passed yet
             if (!_isFaceRecognized) {
-              _updateStatus('Please center your face in the frame');
+              _updateStatus('center_face_in_frame'.tr());
             }
           }
         }
@@ -446,24 +396,15 @@ class _FaceVerificationScreenState
 
       _numberOfFrames++;
       if (_numberOfFrames >= _maxFrames && !_isFaceRecognized) {
-        _updateStatus('Verification timeout - please try again');
-        _retryCount++;
-        if (_retryCount >= _maxRetries) {
-          print('🚨 MAXIMUM RETRIES REACHED! Setting isRetryFinished = true');
-          _updateStatus('Maximum retries reached - verification failed');
-          setState(() {
-            isRetryFinished = true;
-          });
-          print('🚨 isRetryFinished is now: $isRetryFinished');
-          // Stop camera processing and preview
-          _stopCameraProcessing();
-        }
+        _updateStatus('verification_timeout'.tr());
+        // Reset frame counter to continue processing
+        _numberOfFrames = 0;
       }
     } catch (e) {
       print('❌ Error processing image: $e');
       if (mounted) {
         setState(() {
-          _status = 'Error processing image. Please try again.';
+          _status = 'error_processing_image'.tr();
         });
       }
     }
@@ -480,7 +421,8 @@ class _FaceVerificationScreenState
 
     if (leftEyeProb != null && rightEyeProb != null) {
       // Treat blink if either eye closes below threshold (more permissive)
-      const double closedThreshold = 0.35;
+      const double closedThreshold =
+          0.45; // Increased from 0.35 to 0.45 for more lenient detection
       final bool leftClosed = leftEyeProb < closedThreshold;
       final bool rightClosed = rightEyeProb < closedThreshold;
       eyesClosed = leftClosed || rightClosed;
@@ -489,13 +431,13 @@ class _FaceVerificationScreenState
       );
     } else if (leftEyeProb != null) {
       // Only left eye probability available
-      eyesClosed = leftEyeProb < 0.35;
+      eyesClosed = leftEyeProb < 0.45; // Increased from 0.35 to 0.45
       print(
         '👁️ Eye detection: Left=${leftEyeProb.toStringAsFixed(2)}, Right=null, Closed=$eyesClosed',
       );
     } else if (rightEyeProb != null) {
       // Only right eye probability available
-      eyesClosed = rightEyeProb < 0.35;
+      eyesClosed = rightEyeProb < 0.45; // Increased from 0.35 to 0.45
       print(
         '👁️ Eye detection: Left=null, Right=${rightEyeProb.toStringAsFixed(2)}, Closed=$eyesClosed',
       );
@@ -534,7 +476,7 @@ class _FaceVerificationScreenState
         _isFaceRecognized = true;
         setState(() => _progress += 50);
 
-        _updateStatus('Face recognized! Verifying...');
+        _updateStatus('face_recognized_verifying'.tr());
         print('✅ Face recognized! Starting liveness verification');
       }
 
@@ -554,7 +496,7 @@ class _FaceVerificationScreenState
             );
             if (_eyesClosedFrames >= _closedThreshold) {
               _currentEyeState = EyeState.blinkDetected;
-              _updateStatus('Verification successful!');
+              _updateStatus('verification_successful'.tr());
               print('✅ Liveness verification completed!');
             }
           } else {
@@ -566,7 +508,7 @@ class _FaceVerificationScreenState
         case EyeState.blinkDetected:
           if (!eyesClosed) {
             setState(() => _progress += 50);
-            _updateStatus('Access granted!');
+            _updateStatus('access_granted'.tr());
             print('✅ Verification successful! Navigating...');
             // Update last used timestamp in database
             _updateLastUsedTimestamp();
@@ -575,7 +517,10 @@ class _FaceVerificationScreenState
               isNavigatedForward = true;
               navigatePushAndRemoveUntil(
                 context,
-                SelectOperationScreen(employee: widget.employee),
+                SelectOperationScreen(
+                  employee: widget.employee,
+                  isFromFaceVerification: true,
+                ),
                 true,
               );
             }
@@ -590,35 +535,19 @@ class _FaceVerificationScreenState
       }
     } else {
       // Face verification failed - either wrong person or insufficient similarity
-      _retryCount++;
-      print(
-        '🔄 Face verification failed. Retry count: $_retryCount/$_maxRetries',
-      );
-
-      if (_retryCount >= _maxRetries) {
+      print('🔄 Face verification failed. Continuing verification...');
+      
+      if (recognition.id != widget.employee.id) {
+        print('❌ Face verification FAILED: Wrong person (ID mismatch)');
+        _updateStatus('face_does_not_match'.tr());
+      } else if (recognition.distance >= strictDistanceThreshold) {
         print(
-          '🚨 MAXIMUM RETRIES REACHED (face verification failed)! Setting isRetryFinished = true',
+          '❌ Face verification FAILED: Distance too high (${recognition.distance.toStringAsFixed(3)} >= $strictDistanceThreshold)',
         );
-        _updateStatus('Maximum retries reached - verification failed');
-        setState(() {
-          isRetryFinished = true;
-        });
-        print('🚨 isRetryFinished is now: $isRetryFinished');
-        // Stop camera processing and preview
-        _stopCameraProcessing();
+        _updateStatus('face_similarity_too_low'.tr());
       } else {
-        if (recognition.id != widget.employee.id) {
-          print('❌ Face verification FAILED: Wrong person (ID mismatch)');
-          _updateStatus('Face does not match registered employee');
-        } else if (recognition.distance >= strictDistanceThreshold) {
-          print(
-            '❌ Face verification FAILED: Distance too high (${recognition.distance.toStringAsFixed(3)} >= $strictDistanceThreshold)',
-          );
-          _updateStatus('Face similarity too low - please try again');
-        } else {
-          print('❌ Face verification FAILED: Unknown reason');
-          _updateStatus('Face verification failed - please try again');
-        }
+        print('❌ Face verification FAILED: Unknown reason');
+        _updateStatus('face_verification_failed'.tr());
       }
     }
   }
@@ -646,44 +575,6 @@ class _FaceVerificationScreenState
     }
   }
 
-  void _restartVerification() {
-    print('🔄 RESTART VERIFICATION CALLED! Resetting all state...');
-    setState(() {
-      // Reset all verification state variables
-      _isProcessing = false;
-      _isFaceRecognized = false;
-      _isBlinkDetected = false;
-      _progress = 0.0;
-      _frameCounter = 0;
-      _numberOfFrames = 0;
-      _eyesClosedFrames = 0;
-      _currentEyeState = EyeState.none;
-      _retryCount = 0;
-      _isFaceOrientationCentered = false;
-      isNavigatedForward = false;
-      isRetryFinished = false;
-      _status = 'Loading registered face...';
-    });
-    print('🔄 isRetryFinished reset to: $isRetryFinished');
-
-    // Restart camera processing
-    _restartCameraProcessing();
-
-    // Reload registered faces and restart the process
-    _loadRegisteredFaces();
-    print('🔄 Verification process restarted');
-  }
-
-  void _restartCameraProcessing() {
-    try {
-      if (_controller != null && _controller!.value.isInitialized) {
-        _controller!.startImageStream(_processImage);
-        print('📹 Camera processing restarted');
-      }
-    } catch (e) {
-      print('❌ Error restarting camera processing: $e');
-    }
-  }
 
   void _updateStatus(String message) {
     if (_status != message && mounted) {
@@ -760,28 +651,28 @@ class _FaceVerificationScreenState
       if (!isPositionCentered) {
         if (deltaX > thresholdX) {
           _updateStatus(
-            faceCenterX < frameCenterX ? 'Move face right' : 'Move face left',
+            faceCenterX < frameCenterX ? 'move_face_right'.tr() : 'move_face_left'.tr(),
           );
         } else {
           _updateStatus(
-            faceCenterY < frameCenterY ? 'Move face down' : 'Move face up',
+            faceCenterY < frameCenterY ? 'move_face_down'.tr() : 'move_face_up'.tr(),
           );
         }
       } else if (!isOrientationCentered) {
         if (!_faceOrientationPoints.first.x.contains(orientation[0])) {
           _updateStatus(
             orientation[0] < _faceOrientationPoints.first.x.start
-                ? 'Move face down'
-                : 'Move face up',
+                ? 'move_face_down'.tr()
+                : 'move_face_up'.tr(),
           );
         } else if (!_faceOrientationPoints.first.y.contains(orientation[1])) {
           _updateStatus(
             orientation[1] < _faceOrientationPoints.first.y.start
-                ? 'Turn head right'
-                : 'Turn head left',
+                ? 'turn_head_right'.tr()
+                : 'turn_head_left'.tr(),
           );
         } else {
-          _updateStatus('Adjust head tilt');
+          _updateStatus('adjust_head_tilt'.tr());
         }
       }
 
@@ -986,6 +877,19 @@ class _FaceVerificationScreenState
   Widget build(BuildContext context) {
     return SafeArea(
       child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: MColors().darkGrey,
+          automaticallyImplyLeading: false,
+          leading: IconButton(
+            onPressed: () {
+              HapticFeedback.heavyImpact();
+              Navigator.pop(context);
+            },
+            icon: Icon(Icons.arrow_back_ios, color: Colors.white),
+          ),
+
+        ),
+        backgroundColor: Colors.white,
         body: FutureBuilder<void>(
           future: _initializeControllerFuture,
           builder: (context, snapshot) {
@@ -997,36 +901,11 @@ class _FaceVerificationScreenState
                     top: 20.w,
                     left: 0,
                     right: 0,
-                    child: GestureDetector(
-                      onTap: isRetryFinished ? _restartVerification : null,
-                      child: Column(
-                        children: [
-                          if (!isRetryFinished)
-                            Pulse(
-                              child: SvgPicture.asset(
-                                "assets/svg/ic_face.svg",
-                                width: 80.w,
-                                height: 80.w,
-                              ),
-                            ),
-                          if (isRetryFinished) ...[
-                            SvgPicture.asset(
-                              "assets/svg/ic_syncing.svg",
-                              width: 80.w,
-                              height: 80.w,
-                            ),
-                            SizedBox(height: 10.h),
-                            Text(
-                              "click_here_to_repeat".tr(),
-                              style: TextStyle(
-                                color: Colors.black,
-                                fontSize: 22.sp,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ],
+                    child: Pulse(
+                      child: SvgPicture.asset(
+                        "assets/svg/ic_face.svg",
+                        width: 80.w,
+                        height: 80.w,
                       ),
                     ),
                   ),
@@ -1070,34 +949,23 @@ class _FaceVerificationScreenState
                   Align(
                     alignment: Alignment.center,
                     child: ClipOval(
-                      child: SizedBox(
-                        width: 320.w,
-                        height: 320.w,
-                        child: isRetryFinished
-                            ? Container(
-                                color: Colors.grey[300],
-                                child: Center(
-                                  child: Icon(
-                                    Icons.camera_alt_outlined,
-                                    size: 60.w,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                              )
-                            : _controller != null &&
+                        child: SizedBox(
+                          width: 320.w,
+                          height: 320.w,
+                          child: _controller != null &&
                                   _controller!.value.isInitialized
-                            ? CameraPreview(_controller!)
-                            : Container(
-                                color: Colors.black,
-                                child: Center(
-                                  child: Text(
-                                    _status,
-                                    style: TextStyle(color: Colors.white),
-                                    textAlign: TextAlign.center,
+                              ? CameraPreview(_controller!)
+                              : Container(
+                                  color: Colors.black,
+                                  child: Center(
+                                    child: Text(
+                                      _status,
+                                      style: TextStyle(color: Colors.white),
+                                      textAlign: TextAlign.center,
+                                    ),
                                   ),
                                 ),
-                              ),
-                      ),
+                        ),
                     ),
                   ),
 

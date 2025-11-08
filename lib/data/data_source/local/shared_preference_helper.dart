@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:ffi';
 
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:verby_flutter/data/models/remote/device_response.dart';
 import 'package:verby_flutter/data/models/remote/login_response_model.dart';
 import 'package:verby_flutter/data/models/remote/user_model.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
@@ -65,7 +66,6 @@ class SharedPreferencesHelper {
   Future<double?> getFaceTries() async =>
       _sharedPreferences.getDouble(FACE_TRIES);
 
-
   Future<void> setFaceIdForAll(bool value) async {
     await _sharedPreferences.setBool(IS_FACE_ID_FOR_ALL_KEY, value);
   }
@@ -87,12 +87,14 @@ class SharedPreferencesHelper {
 
   Future<void> saveUser(
     LoginResponseModel loginResponse,
+    DeviceResponse deviceResponse,
     String password,
   ) async {
     final user = UserModel(
       id: loginResponse.user?.id,
       email: loginResponse.user?.email,
       deviceID: loginResponse.deviceId,
+      deviceName: deviceResponse.name,
     );
     final userJson = jsonEncode(user.toJson() ?? "");
     await _sharedPreferences.setString(USER_DETAILS_KEY, userJson);

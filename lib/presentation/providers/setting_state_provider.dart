@@ -13,6 +13,7 @@ import 'package:verby_flutter/presentation/providers/usecase/face/is_face_exits_
 import 'package:verby_flutter/presentation/providers/usecase/record/create_multi_remote_record.dart';
 import 'package:verby_flutter/presentation/providers/usecase/sync/sync_data_use_case_provider.dart';
 import 'package:verby_flutter/presentation/providers/usecase/backup/upload_archive_use_case_provider.dart';
+import 'package:verby_flutter/presentation/providers/worker_screen_provider.dart';
 import '../../data/models/remote/record/create_multi_record_request.dart';
 import '../../domain/core/connectivity_helper.dart';
 import '../../domain/entities/states/setting_screen_state.dart';
@@ -30,6 +31,7 @@ class SettingStateProvider extends StateNotifier<SettingScreenState> {
   final UploadArchiveUseCase _uploadArchiveUseCase;
   final CreateMultiRecordRemotelyUseCase _createMultiRecordRemotelyUseCase;
   final DeleteArchiveUseCase _deleteArchiveUseCase;
+  final WorkerScreenProviderNotifier _workerScreenProviderNotifier;
 
   SettingStateProvider(
     this._isFaceExistsUseCase,
@@ -39,6 +41,7 @@ class SettingStateProvider extends StateNotifier<SettingScreenState> {
     this._uploadArchiveUseCase,
     this._createMultiRecordRemotelyUseCase,
     this._deleteArchiveUseCase,
+    this._workerScreenProviderNotifier,
   ) : super(
         SettingScreenState(
           isInternetConnected: ConnectivityHelper().isConnected,
@@ -95,11 +98,13 @@ class SettingStateProvider extends StateNotifier<SettingScreenState> {
         final result = await _syncDataUseCase.syncData(userModel, true);
         if (result.isNotEmpty) {
           setErrorMessage(result);
+        }else{
+          _workerScreenProviderNotifier.getEmployees();
         }
       }
       state = state.copyWith(isLoading: false);
     } else {
-      setErrorMessage("Internet is not available");
+      setErrorMessage("no_internet".tr());
     }
   }
 
@@ -187,9 +192,8 @@ class SettingStateProvider extends StateNotifier<SettingScreenState> {
       (records) async {
         final result = await uploadRecordsFromArchive(records);
         if (result) {
-          if (Platform.isAndroid) {
-            await _deleteArchiveUseCase.call();
-          }
+          await _deleteArchiveUseCase.call();
+
           state = state.copyWith(
             isLoading: false,
             message: 'record_sent_success'.tr(),
@@ -234,6 +238,7 @@ final settingScreenStateProvider =
           createMultiRecordRemoteUseCaseProvider,
         );
         final deleteArchiveUseCase = ref.read(deleteArchiveUseCaseProvider);
+        final workerScreenNotifier= ref.read(workerScreenProvider.notifier);
         return SettingStateProvider(
           isFaceExits,
           getAllFacesUseCase,
@@ -242,6 +247,7 @@ final settingScreenStateProvider =
           uploadArchiveUseCase,
           createMultiRecordsUseCase,
           deleteArchiveUseCase,
+          workerScreenNotifier
         );
       },
     );

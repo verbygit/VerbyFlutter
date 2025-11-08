@@ -11,5 +11,6 @@ abstract class DepaRestantLocalRepository {
     bool isDepa,
   );
   Future<bool> deleteDepaRestants(List<String> roomId);
+  Future<bool> deleteDepaRestantsByEmpId(String empId);
 
 }

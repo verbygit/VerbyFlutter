@@ -12,6 +12,7 @@ class     MColors {
   final vividReddishPink =const Color(0xFFFF3E66);
   final brightOrange =const Color(0xFFF78C0C);
   final darkGrey =const Color(0xFF323232);
+  final darkGrey50Opacity =const Color(0xFF323232).withValues(alpha: 0.5);
   final lightGrey =const Color(0xFFC5C5C5);
   final greenMunsell =const Color(0xFF1CAC78);
   final veryLightGray =const Color(0xCFFEFEFE);
@@ -26,6 +27,8 @@ class     MColors {
   final chartreuse =const Color(0xAEF78812);
   final whiteSmoke =const Color(0xFFEAEAEA);
   final selectedBlue =const Color(0xFF3faef2);
+  final blue =const Color(0xFF2d6efe);
+  final whiteSmoke2 =const Color(0xFFf9f9f9);
 
 
   final white = Colors.white;
