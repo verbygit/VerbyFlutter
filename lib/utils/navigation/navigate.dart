@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 
 void navigateToScreen(BuildContext context, Widget widget) {
   Navigator.push(
@@ -73,4 +74,33 @@ void navigatePushReplacement(BuildContext context, Widget widget) {
       transitionDuration: const Duration(milliseconds: 300),
     ),
   );
+}
+
+/// Safe navigation method that checks if navigator is available
+void safeNavigateBack(BuildContext context) {
+  if (Navigator.canPop(context)) {
+    Navigator.pop(context);
+  }
+}
+
+/// Safe navigation with delay to prevent navigator lock issues
+void safeNavigateBackWithDelay(BuildContext context, {Duration delay = const Duration(milliseconds: 100)}) {
+  Future.delayed(delay, () {
+    if (context.mounted && Navigator.canPop(context)) {
+      Navigator.pop(context);
+    }
+  });
+}
+
+/// Safe navigation to screen with proper error handling
+void  safeNavigateToScreen(BuildContext context, Widget widget) {
+  if (context.mounted) {
+    try {
+      navigateToScreen(context, widget);
+    } catch (e) {
+      print('Navigation error: $e');
+      // Fallback to simple push
+      Navigator.push(context, MaterialPageRoute(builder: (context) => widget));
+    }
+  }
 }

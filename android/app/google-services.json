@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "928578971495",
+    "project_id": "tracer-444ab",
+    "storage_bucket": "tracer-444ab.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:928578971495:android:fb05a9184d9978371731c2",
+        "android_client_info": {
+          "package_name": "com.hotel.verby"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAOcJisor_K5_dmsZdRRMT38555gIeZO00"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
